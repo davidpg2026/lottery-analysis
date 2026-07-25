@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>David's Lottery Analysis</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0e1117;--panel:#161b22;--panel2:#1c232d;--border:#2a323d;
+    --text:#e6edf3;--muted:#9aa7b4;--accent:#f5c518;--accent2:#4aa3ff;--good:#3fb950;
+    --shadow:0 4px 20px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5}
+  a{color:var(--accent2)}
+  header{padding:24px 20px 8px;text-align:center}
+  header h1{margin:0;font-size:1.6rem}
+  header p{margin:6px 0 0;color:var(--muted);font-size:.9rem}
+  .wrap{max-width:1100px;margin:0 auto;padding:0 16px 60px}
+  .disclaimer{background:#2a2416;border:1px solid #5c4d1a;color:#e9d9a0;
+    border-radius:10px;padding:12px 16px;margin:14px 0 18px;font-size:.85rem}
+  .disclaimer b{color:var(--accent)}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:8px 0}
+  .tab{background:var(--panel);border:1px solid var(--border);color:var(--text);
+    padding:8px 16px;border-radius:999px;cursor:pointer;font-size:.9rem;transition:.15s}
+  .tab:hover{border-color:var(--accent2)}
+  .tab.active{background:var(--accent);color:#111;border-color:var(--accent);font-weight:600}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center;margin:14px 0 4px}
+  .controls label{color:var(--muted);font-size:.85rem}
+  select{background:var(--panel2);color:var(--text);border:1px solid var(--border);
+    border-radius:8px;padding:7px 12px;font-size:.88rem}
+  .status{text-align:center;color:var(--muted);font-size:.83rem;margin:8px 0 16px}
+  .status b{color:var(--text)}
+  .pill{display:inline-block;background:var(--panel2);border:1px solid var(--border);
+    border-radius:999px;padding:2px 10px;font-size:.72rem;color:var(--muted);margin:2px 3px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;
+    padding:16px 18px 18px;box-shadow:var(--shadow)}
+  .card h3{margin:0 0 4px;font-size:1rem}
+  .card .sub{color:var(--muted);font-size:.78rem;margin-bottom:12px}
+  .card.full{grid-column:1/-1}
+  .chartbox{position:relative;height:300px}
+  .chartbox.tall{height:360px}
+  .stat-row{display:flex;flex-wrap:wrap;gap:10px}
+  .stat{background:var(--panel2);border:1px solid var(--border);border-radius:10px;
+    padding:10px 14px;flex:1;min-width:110px;text-align:center}
+  .stat .v{font-size:1.3rem;font-weight:700}
+  .stat .l{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.5px}
+  .balls{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+  .ball{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:.9rem;position:relative;background:#eef2f6;color:#111;border:2px solid #cfd8e0}
+  .ball.special{background:var(--accent);border-color:#d9ac00}
+  .ball.digit{border-radius:12px;background:#2b3440;color:#fff;border-color:#3a4552}
+  .ball .cnt{position:absolute;bottom:-15px;left:0;right:0;text-align:center;font-size:.64rem;color:var(--muted);font-weight:500}
+  .balls.withcnt{margin-bottom:18px}
+  table{width:100%;border-collapse:collapse;font-size:.84rem}
+  th,td{padding:6px 8px;text-align:left;border-bottom:1px solid var(--border)}
+  th{color:var(--muted);font-weight:600;font-size:.74rem;text-transform:uppercase;letter-spacing:.4px}
+  td.num{font-weight:700}
+  .bar{height:8px;border-radius:4px;background:var(--accent2)}
+  .loading{text-align:center;padding:50px 20px;color:var(--muted)}
+  .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);
+    border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .err{background:#3a1d1d;border:1px solid #6b2b2b;color:#f3b0b0;border-radius:10px;padding:16px;text-align:center}
+  .note{background:var(--panel2);border:1px solid var(--border);border-radius:8px;
+    padding:8px 12px;font-size:.78rem;color:var(--muted);margin-bottom:14px}
+  footer{text-align:center;color:var(--muted);font-size:.76rem;padding:22px 16px 40px}
+  @media(max-width:520px){.ball{width:36px;height:36px;font-size:.82rem}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎲 David's Lottery Analysis</h1>
+  <p>Historical analysis of official Illinois draw results</p>
+</header>
+
+<div class="wrap">
+  <div class="disclaimer">
+    <b>Read this first.</b> Lottery drawings are independent random events — every outcome has exactly the
+    same chance every single draw, and <b>nothing here can predict results or improve your odds</b>. "Hot,"
+    "cold," and "overdue" describe the past only; they are not forecasts. For curiosity and entertainment.
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="controls">
+    <label for="window">Window:</label>
+    <select id="window">
+      <option value="30">Last 30 draws</option>
+      <option value="60">Last 60 draws</option>
+      <option value="90" selected>Last 90 draws</option>
+      <option value="365">Last 365 draws</option>
+      <option value="all">All available</option>
+    </select>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div id="content"><div class="loading"><div class="spinner"></div>Loading…</div></div>
+</div>
+
+<footer>
+  Powerball & Mega Millions data: New York State Open Data (official multi-state results, identical numbers
+  nationwide). Illinois-only games (Lotto, Lucky Day Lotto, Pick 3, Pick 4): official illinoislottery.com
+  results, refreshed by a daily updater. All analysis runs in your browser.
+  <div style="margin-top:8px">Must be 18+ to play. Problem gambling help: 1-800-GAMBLER.</div>
+</footer>
+
+<script>
+/* ============================================================
+   EMBEDDED ILLINOIS DATA  (newest first)
+   The daily updater appends new draws to these arrays.
+   Ball games: {d:date, t:time?, n:[numbers], s:special|null}
+   Digit games:{d:date, t:time,  g:[digits],  f:fireball|null}
+   ============================================================ */
+/* IL_DATA_START */
+const IL_DATA = {
+  "lotto": { "seededThrough":"2026-07-20", "draws":[
+    {"d":"2026-07-20","n":[4,7,20,21,41,48],"s":4},
+    {"d":"2026-07-18","n":[17,26,28,35,41,42],"s":15},
+    {"d":"2026-07-16","n":[11,19,25,33,35,38],"s":23},
+    {"d":"2026-07-13","n":[10,15,20,23,24,30],"s":9},
+    {"d":"2026-07-11","n":[20,23,30,32,46,49],"s":21},
+    {"d":"2026-07-09","n":[5,13,20,28,32,49],"s":23},
+    {"d":"2026-07-06","n":[5,9,11,14,21,36],"s":15},
+    {"d":"2026-07-04","n":[8,9,10,17,26,38],"s":19},
+    {"d":"2026-07-02","n":[6,12,13,32,33,34],"s":20},
+    {"d":"2026-06-29","n":[8,16,19,32,36,38],"s":19}
+  ]},
+  "luckydaylotto": { "seededThrough":"2026-07-24", "draws":[
+    {"d":"2026-07-24","t":"midday","n":[7,14,16,20,30],"s":null},
+    {"d":"2026-07-23","t":"evening","n":[9,25,37,42,45],"s":null},
+    {"d":"2026-07-23","t":"midday","n":[2,6,16,18,24],"s":null},
+    {"d":"2026-07-22","t":"evening","n":[4,18,19,27,33],"s":null},
+    {"d":"2026-07-22","t":"midday","n":[8,18,36,39,44],"s":null},
+    {"d":"2026-07-21","t":"evening","n":[11,20,31,34,43],"s":null},
+    {"d":"2026-07-21","t":"midday","n":[12,21,25,37,40],"s":null},
+    {"d":"2026-07-20","t":"evening","n":[8,16,19,34,45],"s":null},
+    {"d":"2026-07-20","t":"midday","n":[2,8,22,24,29],"s":null},
+    {"d":"2026-07-19","t":"evening","n":[9,13,25,26,34],"s":null},
+    {"d":"2026-07-19","t":"midday","n":[3,11,19,21,44],"s":null},
+    {"d":"2026-07-18","t":"evening","n":[6,21,26,28,44],"s":null},
+    {"d":"2026-07-18","t":"midday","n":[6,15,17,35,37],"s":null},
+    {"d":"2026-07-17","t":"evening","n":[8,28,32,40,41],"s":null},
+    {"d":"2026-07-17","t":"midday","n":[6,7,9,20,34],"s":null}
+  ]},
+  "pick3": { "seededThrough":"2026-07-23", "draws":[
+    {"d":"2026-07-23","t":"evening","g":[5,0,6],"f":3},
+    {"d":"2026-07-23","t":"midday","g":[0,3,7],"f":8},
+    {"d":"2026-07-22","t":"evening","g":[1,6,6],"f":2},
+    {"d":"2026-07-22","t":"midday","g":[2,8,1],"f":0},
+    {"d":"2026-07-21","t":"evening","g":[9,6,8],"f":6},
+    {"d":"2026-07-21","t":"midday","g":[5,4,0],"f":9},
+    {"d":"2026-07-20","t":"evening","g":[2,3,8],"f":2},
+    {"d":"2026-07-20","t":"midday","g":[1,3,0],"f":0},
+    {"d":"2026-07-19","t":"evening","g":[5,4,1],"f":6},
+    {"d":"2026-07-19","t":"midday","g":[4,6,2],"f":1}
+  ]},
+  "pick4": { "seededThrough":"2026-07-22", "draws":[
+    {"d":"2026-07-22","t":"evening","g":[1,3,1,2],"f":8},
+    {"d":"2026-07-22","t":"midday","g":[6,0,7,1],"f":9},
+    {"d":"2026-07-21","t":"evening","g":[0,6,2,3],"f":3},
+    {"d":"2026-07-21","t":"midday","g":[3,6,8,6],"f":7},
+    {"d":"2026-07-20","t":"evening","g":[9,1,5,0],"f":6},
+    {"d":"2026-07-20","t":"midday","g":[1,1,5,9],"f":1},
+    {"d":"2026-07-19","t":"evening","g":[3,4,3,7],"f":0},
+    {"d":"2026-07-19","t":"midday","g":[6,1,1,8],"f":3},
+    {"d":"2026-07-18","t":"evening","g":[2,2,6,2],"f":2},
+    {"d":"2026-07-18","t":"midday","g":[5,3,5,4],"f":9}
+  ]}
+};
+/* IL_DATA_END */
+
+/* ============================================================
+   GAME CONFIG
+   ============================================================ */
+const GAMES = {
+  powerball:{name:"Powerball",type:"ball",src:"live",
+    endpoint:"https://data.ny.gov/resource/d6yy-54nr.json",
+    whiteCount:5,whiteMax:69,specialName:"Powerball",specialMax:26,
+    liveParse:r=>{const t=(r.winning_numbers||"").trim().split(/\s+/).map(Number);
+      if(t.length<6||t.some(isNaN))return null;return{d:r.draw_date.slice(0,10),n:t.slice(0,5),s:t[5]};}},
+  megamillions:{name:"Mega Millions",type:"ball",src:"live",
+    endpoint:"https://data.ny.gov/resource/5xaw-6ayf.json",
+    whiteCount:5,whiteMax:70,specialName:"Mega Ball",specialMax:25,
+    liveParse:r=>{const t=(r.winning_numbers||"").trim().split(/\s+/).map(Number);const mb=Number(r.mega_ball);
+      if(t.length<5||t.some(isNaN)||isNaN(mb))return null;return{d:r.draw_date.slice(0,10),n:t.slice(0,5),s:mb};}},
+  lotto:{name:"Lotto",type:"ball",src:"il",key:"lotto",
+    whiteCount:6,whiteMax:50,specialName:"Extra Shot",specialMax:25},
+  luckydaylotto:{name:"Lucky Day Lotto",type:"ball",src:"il",key:"luckydaylotto",
+    whiteCount:5,whiteMax:45,specialName:null,specialMax:0},
+  pick3:{name:"Pick 3",type:"digit",src:"il",key:"pick3",digitCount:3,fireball:true},
+  pick4:{name:"Pick 4",type:"digit",src:"il",key:"pick4",digitCount:4,fireball:true}
+};
+
+const state={game:"powerball",cache:{},charts:[],window:"90"};
+
+/* ---------- data loading ---------- */
+async function getDraws(key){
+  if(state.cache[key])return state.cache[key];
+  const g=GAMES[key];
+  let draws;
+  if(g.src==="live"){
+    const url=g.endpoint+"?$limit=50000&$order=draw_date%20DESC";
+    const res=await fetch(url);
+    if(!res.ok)throw new Error("HTTP "+res.status);
+    draws=(await res.json()).map(g.liveParse).filter(Boolean);
+    draws.sort((a,b)=>a.d<b.d?1:-1);
+  }else{
+    draws=(IL_DATA[g.key]?.draws||[]).slice(); // already newest-first
+  }
+  state.cache[key]=draws;
+  return draws;
+}
+function windowed(draws){
+  if(state.window==="all")return draws;
+  return draws.slice(0,Number(state.window));
+}
+
+/* ============================================================
+   BALL-GAME ANALYSIS
+   ============================================================ */
+function analyzeBall(draws,g){
+  const N=draws.length;
+  const whiteMax=Math.max(g.whiteMax,...draws.flatMap(d=>d.n));
+  const hasSpecial=g.specialName!=null;
+  const specialVals=hasSpecial?draws.map(d=>d.s).filter(v=>v!=null):[];
+  const specialMax=hasSpecial?Math.max(g.specialMax,...specialVals,1):0;
+
+  const wFreq=Array(whiteMax+1).fill(0), wGap=Array(whiteMax+1).fill(null);
+  const sFreq=Array(specialMax+1).fill(0);
+  const sums=[],odd=[],low=[],ranges=[];
+  const lowThresh=Math.floor(whiteMax/2);
+  const pairs={}, triplets={}; let consecDraws=0, repeatWithPrev=0, repeatTotal=0;
+
+  draws.forEach((d,i)=>{
+    const ns=[...d.n].sort((a,b)=>a-b);
+    ns.forEach(n=>{wFreq[n]++; if(wGap[n]===null)wGap[n]=i;});
+    if(hasSpecial&&d.s!=null)sFreq[d.s]++;
+    sums.push(d.n.reduce((a,b)=>a+b,0));
+    odd.push(d.n.filter(n=>n%2).length);
+    low.push(d.n.filter(n=>n<=lowThresh).length);
+    ranges.push(Math.max(...d.n)-Math.min(...d.n));
+    // consecutive pair present?
+    let hasConsec=false;
+    for(let k=1;k<ns.length;k++)if(ns[k]-ns[k-1]===1)hasConsec=true;
+    if(hasConsec)consecDraws++;
+    // pair & triplet co-occurrence
+    for(let a=0;a<ns.length;a++)for(let b=a+1;b<ns.length;b++){
+      const key=ns[a]+"-"+ns[b]; pairs[key]=(pairs[key]||0)+1;
+      for(let c=b+1;c<ns.length;c++){const tk=ns[a]+"-"+ns[b]+"-"+ns[c]; triplets[tk]=(triplets[tk]||0)+1;}}
+    // repeat from previous draw
+    if(i<draws.length-1){
+      const prev=new Set(draws[i+1].n);
+      const rep=d.n.filter(n=>prev.has(n)).length;
+      repeatTotal+=rep; if(rep>0)repeatWithPrev++;
+    }
+  });
+
+  const whites=[];
+  for(let n=1;n<=whiteMax;n++)whites.push({n,count:wFreq[n],gap:wGap[n]===null?N:wGap[n]});
+  const specials=[];
+  for(let n=1;n<=specialMax;n++)specials.push({n,count:sFreq[n]});
+
+  const avg=a=>a.reduce((x,y)=>x+y,0)/(a.length||1);
+  const hist=(arr,min,max,bins)=>{const step=(max-min)/bins||1,out=Array(bins).fill(0),labels=[];
+    arr.forEach(v=>{let i=Math.min(bins-1,Math.floor((v-min)/step));if(i<0)i=0;out[i]++;});
+    for(let i=0;i<bins;i++)labels.push(Math.round(min+i*step)+"–"+Math.round(min+(i+1)*step));return{out,labels};};
+
+  const topPairs=Object.entries(pairs).map(([k,c])=>({k,c})).sort((a,b)=>b.c-a.c).slice(0,10);
+  const topTriplets=Object.entries(triplets).map(([k,c])=>({k,c})).sort((a,b)=>b.c-a.c).slice(0,10);
+  const byYear={};draws.forEach(d=>{const y=d.d.slice(0,4);byYear[y]=(byYear[y]||0)+1;});
+  const prevComparable=Math.max(1,N-1);
+
+  // expected frequency + random-variation band (Binomial: each number appears with p per draw)
+  const p=g.whiteCount/whiteMax;
+  const expected=N*p, sd=Math.sqrt(N*p*(1-p));
+
+  // spacing / delta: gaps between adjacent sorted numbers
+  const gapCounts={};
+  draws.forEach(d=>{const s=[...d.n].sort((a,b)=>a-b);for(let k=1;k<s.length;k++){const gp=s[k]-s[k-1];gapCounts[gp]=(gapCounts[gp]||0)+1;}});
+  const maxGap=Math.max(1,...Object.keys(gapCounts).map(Number));
+  const gapArr=[];for(let i=1;i<=maxGap;i++)gapArr.push(gapCounts[i]||0);
+
+  // companion map: for each number, who it was drawn with, and how often
+  const companions={};
+  Object.entries(pairs).forEach(([k,c])=>{const [a,b]=k.split('-').map(Number);
+    (companions[a]=companions[a]||{})[b]=c;(companions[b]=companions[b]||{})[a]=c;});
+
+  // chronological series (oldest -> newest) for trend charts
+  const sumSeries=[...sums].reverse();
+  const dateSeries=draws.map(d=>d.d).reverse();
+
+  return {N,whiteMax,specialMax,hasSpecial,whites,specials,
+    sums,avgSum:avg(sums),minSum:Math.min(...sums),maxSum:Math.max(...sums),
+    odd,low,ranges,avgRange:avg(ranges),
+    sumHist:hist(sums,g.whiteCount,g.whiteCount*whiteMax,12),
+    topPairs,consecPct:consecDraws/N*100,
+    repeatPct:repeatWithPrev/prevComparable*100,avgRepeat:repeatTotal/prevComparable,
+    byYear,whiteCount:g.whiteCount,topTriplets,
+    expected,sd,gapArr,maxGap,companions,sumSeries,dateSeries};
+}
+
+/* ============================================================
+   DIGIT-GAME ANALYSIS
+   ============================================================ */
+function analyzeDigit(draws,g){
+  const N=draws.length, K=g.digitCount;
+  const posFreq=Array.from({length:K},()=>Array(10).fill(0));
+  const allFreq=Array(10).fill(0), fFreq=Array(10).fill(0);
+  const sums=[]; let doubles=0,triples=0,quads=0,allDiff=0;
+  let straightRepeatPrev=0;
+
+  draws.forEach((d,i)=>{
+    d.g.forEach((dig,p)=>{posFreq[p][dig]++;allFreq[dig]++;});
+    if(g.fireball&&d.f!=null)fFreq[d.f]++;
+    sums.push(d.g.reduce((a,b)=>a+b,0));
+    const counts={};d.g.forEach(x=>counts[x]=(counts[x]||0)+1);
+    const mx=Math.max(...Object.values(counts));
+    const uniq=Object.keys(counts).length;
+    if(uniq===K)allDiff++;
+    if(mx===2&&K-uniq>=1&&mx<3)doubles++;
+    if(mx===3)triples++;
+    if(mx===4)quads++;
+    if(i<draws.length-1&&draws[i+1].g.join("")===d.g.join(""))straightRepeatPrev++;
+  });
+
+  const avg=a=>a.reduce((x,y)=>x+y,0)/(a.length||1);
+  const sumCounts={};sums.forEach(s=>sumCounts[s]=(sumCounts[s]||0)+1);
+  const maxSum=9*K,sumArr=[];for(let s=0;s<=maxSum;s++)sumArr.push(sumCounts[s]||0);
+
+  const p=1/10; const expectedAll=N*K*p, sdAll=Math.sqrt(N*K*p*(1-p));
+  const digitSumSeries=[...sums].reverse();
+  const dateSeries=draws.map(d=>d.d).reverse();
+
+  return {N,K,posFreq,allFreq,fFreq,fireball:g.fireball,
+    sums,avgSum:avg(sums),sumArr,maxSum,
+    allDiff,doubles,triples,quads,
+    expectedAll,sdAll,digitSumSeries,dateSeries};
+}
+
+/* shared helper: moving average */
+function movAvg(arr,w){const out=[];for(let i=0;i<arr.length;i++){const s=Math.max(0,i-w+1);const seg=arr.slice(s,i+1);out.push(seg.reduce((a,b)=>a+b,0)/seg.length);}return out;}
+/* build a frequency array over 1..max for a subset of ball draws */
+function freqArray(draws,max){const f=Array(max+1).fill(0);draws.forEach(d=>d.n.forEach(n=>f[n]++));return f;}
+/* overall digit frequency for a subset of digit draws */
+function digitFreqArray(draws){const f=Array(10).fill(0);draws.forEach(d=>d.g.forEach(x=>f[x]++));return f;}
+
+/* ---- Consensus Quick Pick (FOR FUN — does NOT change odds) ----
+   Ball games: weighted-random candidates biased by frequency + companion
+   strength, then the candidate closest to the typical sum/odd/low profile wins. */
+function consensusBallPick(A,g){
+  const whiteMax=A.whiteMax,K=g.whiteCount,lowThresh=Math.floor(whiteMax/2);
+  const modeOf=arr=>{const c={};arr.forEach(v=>c[v]=(c[v]||0)+1);return +Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0];};
+  const modeOdd=modeOf(A.odd),modeLow=modeOf(A.low),targetSum=A.avgSum;
+  const freq=n=>{const w=A.whites.find(x=>x.n===n);return w?w.count:0;};
+  const weightedPick=(avail,set)=>{let tot=0;const ws=avail.map(n=>{let w=freq(n)+0.5;
+    set.forEach(m=>{w*=1+((A.companions[m]||{})[n]||0)*0.25;});tot+=w;return w;});
+    let r=Math.random()*tot;for(let i=0;i<avail.length;i++){r-=ws[i];if(r<=0)return avail[i];}return avail[avail.length-1];};
+  const gen=()=>{const chosen=[];while(chosen.length<K){const avail=[];for(let n=1;n<=whiteMax;n++)if(!chosen.includes(n))avail.push(n);chosen.push(weightedPick(avail,chosen));}return chosen.sort((a,b)=>a-b);};
+  let best=null,bestScore=-Infinity;
+  for(let i=0;i<500;i++){const c=gen();const sum=c.reduce((a,b)=>a+b,0),oddc=c.filter(n=>n%2).length,lowc=c.filter(n=>n<=lowThresh).length,hot=c.reduce((a,n)=>a+freq(n),0);
+    const score=-Math.abs(sum-targetSum)*0.4-Math.abs(oddc-modeOdd)*3-Math.abs(lowc-modeLow)*3+hot*0.5;
+    if(score>bestScore){bestScore=score;best=c;}}
+  let special=null;
+  if(A.hasSpecial&&A.specials.length){let tot=0;const ws=A.specials.map(s=>{const w=s.count+0.5;tot+=w;return w;});
+    let r=Math.random()*tot;for(let i=0;i<A.specials.length;i++){r-=ws[i];if(r<=0){special=A.specials[i].n;break;}}if(special==null)special=A.specials[0].n;}
+  return {nums:best,special};
+}
+function consensusDigitPick(A,g){
+  const pick=arr=>{let tot=0;const ws=arr.map(v=>v+0.5);ws.forEach(w=>tot+=w);let r=Math.random()*tot;for(let i=0;i<10;i++){r-=ws[i];if(r<=0)return i;}return 9;};
+  return {digits:A.posFreq.map(pf=>pick(pf)),fb:g.fireball?pick(A.fFreq):null};
+}
+
+/* ============================================================
+   RENDER HELPERS
+   ============================================================ */
+function destroyCharts(){state.charts.forEach(c=>c.destroy());state.charts=[];}
+function mk(id,cfg){const el=document.getElementById(id);if(!el)return;const c=new Chart(el,cfg);state.charts.push(c);return c;}
+const GRID="#2a323d",TICK="#9aa7b4";
+const baseOpts=extra=>Object.assign({responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{labels:{color:TICK}}},
+  scales:{x:{ticks:{color:TICK},grid:{color:GRID}},y:{ticks:{color:TICK},grid:{color:GRID},beginAtZero:true}}},extra||{});
+function ballRow(items,cls,withCount){
+  return `<div class="balls ${withCount?'withcnt':''}">`+items.map(it=>
+    `<div class="ball ${cls||''}">${String(it.n).padStart(2,'0')}`+
+    (withCount?`<span class="cnt">${it.count}×</span>`:``)+`</div>`).join("")+`</div>`;}
+function palette(k){const p=[];for(let i=0;i<k;i++){const h=Math.round(210-(i/((k-1)||1))*210);p.push(`hsl(${h},70%,58%)`);}return p;}
+
+/* ---------- render dispatch ---------- */
+function render(){
+  const g=GAMES[state.game];
+  const all=state.cache[state.game];
+  const draws=windowed(all);
+  if(!draws.length){document.getElementById("content").innerHTML=`<div class="err">No draws available yet for this game.</div>`;return;}
+  destroyCharts();
+  if(g.type==="ball")renderBall(g,all,draws);
+  else renderDigit(g,all,draws);
+}
+
+function shortWindowNote(all){
+  const req=state.window==="all"?all.length:Number(state.window);
+  if(state.window!=="all"&&all.length<req)
+    return `<div class="note">Only <b>${all.length}</b> draws are available so far, fewer than the ${req} requested — this window shows all of them. Illinois-only games grow as the daily updater collects more results.</div>`;
+  return "";
+}
+
+/* ---------- BALL render ---------- */
+function renderBall(g,all,draws){
+  const A=analyzeBall(draws,g);
+  const latest=all[0], oldest=draws[draws.length-1];
+  document.getElementById("status").innerHTML=
+    `<b>${g.name}</b> · ${A.N} draws (${oldest.d} → ${latest.d}) · latest <b>${latest.d}</b>`+
+    `<span class="pill">${g.whiteCount} of 1–${A.whiteMax}</span>`+
+    (A.hasSpecial?`<span class="pill">${g.specialName} 1–${A.specialMax}</span>`:`<span class="pill">no bonus ball</span>`)+
+    (g.src==="live"?`<span class="pill">live feed</span>`:`<span class="pill">IL daily updater</span>`);
+
+  const hotW=[...A.whites].sort((a,b)=>b.count-a.count).slice(0,g.whiteCount);
+  const coldW=[...A.whites].filter(w=>w.count>0||true).sort((a,b)=>a.count-b.count).slice(0,g.whiteCount);
+  const overdue=[...A.whites].sort((a,b)=>b.gap-a.gap).slice(0,10);
+  const hotS=[...A.specials].sort((a,b)=>b.count-a.count).slice(0,3);
+
+  const specialCards=A.hasSpecial?`
+    <div class="card"><h3>🔥 Hot ${g.specialName}</h3><div class="sub">Most frequent bonus ball.</div>${ballRow(hotS,'special',true)}</div>
+    <div class="card"><h3>${g.specialName} frequency</h3><div class="sub">Counts for 1–${A.specialMax}.</div><div class="chartbox"><canvas id="c_sfreq"></canvas></div></div>`:``;
+
+  const daily=draws.some(d=>d.t==='midday')&&draws.some(d=>d.t==='evening');
+  const todCard=daily?`<div class="card full"><h3>🕐 Midday vs evening</h3><div class="sub">Number frequency split by draw time — a fair game shows no meaningful midday/evening difference.</div><div class="chartbox tall"><canvas id="c_tod"></canvas></div></div>`:``;
+  const numOpts=A.whites.map(w=>`<option value="${w.n}">${w.n}</option>`).join("");
+
+  document.getElementById("content").innerHTML=shortWindowNote(all)+`<div class="grid">
+    <div class="card full" style="border-color:#5c4d1a"><h3>🎯 Consensus Quick Pick</h3><div class="sub">A combination assembled from this window's patterns — hot numbers, common companions, and the typical sum / odd-even / low-high profile. <b style="color:var(--accent)">For fun only: every combination has identical odds, and this does not improve your chances of winning.</b></div><div id="pickOut" style="margin-top:6px"></div><button id="pickBtn" class="tab" style="margin-top:12px">🎲 Generate a pick</button></div>
+    <div class="card full"><h3>Number frequency vs random chance</h3><div class="sub">Bars = times drawn (red above average). The dashed line is the count expected from pure chance, and the shaded band is the normal ±2σ range of random variation — bars inside it are indistinguishable from randomness.</div><div class="chartbox tall"><canvas id="c_wfreq"></canvas></div></div>
+    <div class="card"><h3>🔥 Hottest</h3><div class="sub">Most drawn this window.</div>${ballRow(hotW,'',true)}</div>
+    <div class="card"><h3>❄️ Coldest</h3><div class="sub">Least drawn this window.</div>${ballRow(coldW,'',true)}</div>
+    ${specialCards}
+    <div class="card full"><h3>⏳ Gaps & overdue</h3><div class="sub">Draws since each number last appeared. Longest current dry spells — descriptive only, not a prediction.</div>
+      <table><thead><tr><th>Number</th><th>Draws since seen</th><th>Times drawn</th><th></th></tr></thead><tbody>
+      ${overdue.map(o=>{const w=Math.min(100,o.gap/(A.N||1)*300);return `<tr><td class="num">${String(o.n).padStart(2,'0')}</td><td>${o.gap}</td><td>${o.count}</td><td style="width:40%"><div class="bar" style="width:${Math.max(6,w)}%"></div></td></tr>`;}).join("")}
+      </tbody></table></div>
+    <div class="card full"><h3>Sum of numbers</h3><div class="sub">Combined total per draw. Middle values are more common simply because more combinations land there.</div>
+      <div class="stat-row"><div class="stat"><div class="v">${A.avgSum.toFixed(0)}</div><div class="l">Avg sum</div></div><div class="stat"><div class="v">${A.minSum}</div><div class="l">Low</div></div><div class="stat"><div class="v">${A.maxSum}</div><div class="l">High</div></div><div class="stat"><div class="v">${A.avgRange.toFixed(0)}</div><div class="l">Avg spread</div></div></div>
+      <div class="chartbox" style="margin-top:14px"><canvas id="c_sum"></canvas></div></div>
+    <div class="card"><h3>Odd / even</h3><div class="sub">How many numbers were odd.</div><div class="chartbox"><canvas id="c_oe"></canvas></div></div>
+    <div class="card"><h3>Low / high</h3><div class="sub">Numbers in the lower half (1–${Math.floor(A.whiteMax/2)}).</div><div class="chartbox"><canvas id="c_lh"></canvas></div></div>
+    <div class="card"><h3>🔗 Most common pairs</h3><div class="sub">Number pairs that appeared together most often.</div>
+      <table><thead><tr><th>Pair</th><th>Times together</th></tr></thead><tbody>
+      ${A.topPairs.map(p=>`<tr><td class="num">${p.k.split('-').map(x=>String(x).padStart(2,'0')).join(' & ')}</td><td>${p.c}</td></tr>`).join("")}
+      </tbody></table></div>
+    <div class="card"><h3>🔺 Most common triplets</h3><div class="sub">Three-number combinations that appeared together most often.</div>
+      <table><thead><tr><th>Triplet</th><th>Times together</th></tr></thead><tbody>
+      ${A.topTriplets.length?A.topTriplets.map(p=>`<tr><td class="num">${p.k.split('-').map(x=>String(x).padStart(2,'0')).join(' · ')}</td><td>${p.c}</td></tr>`).join(""):`<tr><td colspan="2" style="color:var(--muted)">Not enough draws yet.</td></tr>`}
+      </tbody></table></div>
+    <div class="card"><h3>Patterns</h3><div class="sub">Extra structural stats for this window.</div>
+      <div class="stat-row" style="flex-direction:column">
+        <div class="stat"><div class="v">${A.consecPct.toFixed(0)}%</div><div class="l">Draws with ≥1 consecutive pair</div></div>
+        <div class="stat"><div class="v">${A.repeatPct.toFixed(0)}%</div><div class="l">Draws repeating a number from the prior draw</div></div>
+        <div class="stat"><div class="v">${A.avgRepeat.toFixed(2)}</div><div class="l">Avg numbers repeated from prior draw</div></div>
+      </div></div>
+    <div class="card"><h3>📏 Number spacing (deltas)</h3><div class="sub">Gaps between adjacent numbers in a sorted draw. Small gaps are common; large gaps rare.</div><div class="chartbox"><canvas id="c_gap"></canvas></div></div>
+    <div class="card"><h3>🤝 Companion lookup</h3><div class="sub">Pick a number to see which numbers it has been drawn with most.</div>
+      <select id="companionSel" style="margin-bottom:10px">${numOpts}</select>
+      <div id="companionOut"></div></div>
+    <div class="card full"><h3>📈 Sum trend over time</h3><div class="sub">Sum of each draw (faint) with a moving average (bold), oldest → newest. Trend lines drift around the average with no lasting direction — the hallmark of randomness.</div><div class="chartbox"><canvas id="c_trend"></canvas></div></div>
+    ${todCard}
+    <div class="card full"><h3>📅 Draw activity by year</h3><div class="sub">Drawings recorded per year in this window.</div><div class="chartbox"><canvas id="c_year"></canvas></div></div>
+  </div>`;
+
+  // charts
+  const wLabels=A.whites.map(w=>w.n),wData=A.whites.map(w=>w.count);
+  const avgF=wData.reduce((a,b)=>a+b,0)/(wData.length||1);
+  const up=wLabels.map(()=>A.expected+2*A.sd), lo=wLabels.map(()=>Math.max(0,A.expected-2*A.sd)), ex=wLabels.map(()=>A.expected);
+  mk("c_wfreq",{type:"bar",data:{labels:wLabels,datasets:[
+    {type:"bar",label:"Times drawn",data:wData,backgroundColor:wData.map(v=>v>=avgF?"rgba(255,92,92,.8)":"rgba(74,163,255,.8)"),order:3},
+    {type:"line",label:"±2σ random range",data:up,borderColor:"rgba(245,197,24,.45)",borderWidth:1,pointRadius:0,fill:"+1",backgroundColor:"rgba(245,197,24,.08)",order:1},
+    {type:"line",label:"_lower",data:lo,borderColor:"rgba(245,197,24,.45)",borderWidth:1,pointRadius:0,fill:false,order:1},
+    {type:"line",label:"expected (chance)",data:ex,borderColor:"rgba(255,255,255,.6)",borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false,order:0}
+  ]},options:baseOpts({plugins:{legend:{display:true,labels:{color:TICK,filter:i=>i.text[0]!=="_"}},tooltip:{callbacks:{title:i=>"Number "+i[0].label}}}})});
+  if(A.hasSpecial)mk("c_sfreq",{type:"bar",data:{labels:A.specials.map(s=>s.n),datasets:[{data:A.specials.map(s=>s.count),backgroundColor:"rgba(245,197,24,.85)"}]},options:baseOpts({plugins:{legend:{display:false}}})});
+  // spacing / deltas
+  mk("c_gap",{type:"bar",data:{labels:A.gapArr.map((_,i)=>i+1),datasets:[{data:A.gapArr,backgroundColor:"rgba(74,163,255,.8)"}]},options:baseOpts({plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>"Gap of "+i[0].label}}}})});
+  // sum trend
+  const ma=movAvg(A.sumSeries,Math.min(10,Math.max(2,Math.floor(A.N/6))));
+  mk("c_trend",{data:{labels:A.dateSeries,datasets:[
+    {type:"line",label:"Draw sum",data:A.sumSeries,borderColor:"rgba(74,163,255,.35)",pointRadius:0,borderWidth:1,fill:false},
+    {type:"line",label:"Moving average",data:ma,borderColor:"#f5c518",pointRadius:0,borderWidth:2,fill:false,tension:.2}
+  ]},options:baseOpts({scales:{x:{ticks:{color:TICK,maxTicksLimit:8},grid:{color:GRID}},y:{ticks:{color:TICK},grid:{color:GRID}}}})});
+  // midday vs evening
+  if(daily){
+    const mid=freqArray(draws.filter(d=>d.t==='midday'),A.whiteMax), eve=freqArray(draws.filter(d=>d.t==='evening'),A.whiteMax);
+    mk("c_tod",{type:"bar",data:{labels:wLabels,datasets:[
+      {label:"Midday",data:wLabels.map(n=>mid[n]),backgroundColor:"rgba(74,163,255,.8)"},
+      {label:"Evening",data:wLabels.map(n=>eve[n]),backgroundColor:"rgba(245,197,24,.8)"}
+    ]},options:baseOpts({plugins:{tooltip:{callbacks:{title:i=>"Number "+i[0].label}}}})});
+  }
+  // companion lookup interactivity
+  const selEl=document.getElementById("companionSel"), outEl=document.getElementById("companionOut");
+  function showCompanions(num){
+    const m=A.companions[num]||{};
+    const rows=Object.entries(m).map(([k,c])=>({n:+k,c})).sort((a,b)=>b.c-a.c).slice(0,8);
+    outEl.innerHTML=rows.length?`<table><thead><tr><th>Partner</th><th>Times together</th></tr></thead><tbody>`+
+      rows.map(r=>`<tr><td class="num">${String(r.n).padStart(2,'0')}</td><td>${r.c}</td></tr>`).join("")+`</tbody></table>`
+      :`<div style="color:var(--muted);font-size:.82rem">No pairings recorded yet.</div>`;
+  }
+  if(selEl){selEl.onchange=e=>showCompanions(+e.target.value);showCompanions(+selEl.value);}
+  // consensus quick pick
+  const pickBtn=document.getElementById("pickBtn"),pickOut=document.getElementById("pickOut");
+  function doPick(){const p=consensusBallPick(A,g);
+    pickOut.innerHTML=ballRow(p.nums.map(n=>({n})),'',false)+
+      (p.special!=null?`<div style="margin-top:8px;font-size:.82rem;color:var(--muted)">${g.specialName}: <b style="color:var(--accent)">${String(p.special).padStart(2,'0')}</b></div>`:'');}
+  if(pickBtn){pickBtn.onclick=doPick;doPick();}
+  mk("c_sum",{type:"bar",data:{labels:A.sumHist.labels,datasets:[{data:A.sumHist.out,backgroundColor:"rgba(63,185,80,.8)"}]},options:baseOpts({plugins:{legend:{display:false}}})});
+  const K=g.whiteCount;
+  const oe=Array(K+1).fill(0);A.odd.forEach(v=>oe[v]++);
+  mk("c_oe",{type:"doughnut",data:{labels:oe.map((_,i)=>i+" odd"),datasets:[{data:oe,backgroundColor:palette(K+1)}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:TICK,font:{size:10}}}}}});
+  const lh=Array(K+1).fill(0);A.low.forEach(v=>lh[v]++);
+  mk("c_lh",{type:"doughnut",data:{labels:lh.map((_,i)=>i+" low"),datasets:[{data:lh,backgroundColor:palette(K+1).reverse()}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:TICK,font:{size:10}}}}}});
+  const years=Object.keys(A.byYear).sort();
+  mk("c_year",{type:"line",data:{labels:years,datasets:[{data:years.map(y=>A.byYear[y]),borderColor:"#4aa3ff",backgroundColor:"rgba(74,163,255,.15)",fill:true,tension:.25}]},options:baseOpts({plugins:{legend:{display:false}}})});
+}
+
+/* ---------- DIGIT render ---------- */
+function renderDigit(g,all,draws){
+  const A=analyzeDigit(draws,g);
+  const latest=all[0],oldest=draws[draws.length-1];
+  document.getElementById("status").innerHTML=
+    `<b>${g.name}</b> · ${A.N} draws (${oldest.d} → ${latest.d}) · latest <b>${latest.d}</b>`+
+    `<span class="pill">${g.digitCount} digits · 0–9 each</span>`+
+    (g.fireball?`<span class="pill">Fireball</span>`:``)+`<span class="pill">IL daily updater</span>`;
+
+  const posLabels=Array.from({length:g.digitCount},(_,i)=>"Position "+(i+1));
+  const daily=draws.some(d=>d.t==='midday')&&draws.some(d=>d.t==='evening');
+  const todCard=daily?`<div class="card full"><h3>🕐 Midday vs evening</h3><div class="sub">Overall digit frequency split by draw time.</div><div class="chartbox"><canvas id="c_tod"></canvas></div></div>`:``;
+  document.getElementById("content").innerHTML=shortWindowNote(all)+`<div class="grid">
+    <div class="card full" style="border-color:#5c4d1a"><h3>🎯 Consensus Quick Pick</h3><div class="sub">Digits drawn from each position's historical frequency, plus a Fireball. <b style="color:var(--accent)">For fun only: draws are random and this does not improve your odds.</b></div><div id="pickOut" style="margin-top:6px"></div><button id="pickBtn" class="tab" style="margin-top:12px">🎲 Generate a pick</button></div>
+    <div class="card full"><h3>Digit frequency by position</h3><div class="sub">How often each digit 0–9 landed in each position. In a fair game all bars trend toward equal over time.</div><div class="chartbox tall"><canvas id="c_pos"></canvas></div></div>
+    <div class="card"><h3>Overall digit frequency vs chance</h3><div class="sub">All positions combined. Dashed line = expected from chance; shaded band = ±2σ random range.</div><div class="chartbox"><canvas id="c_all"></canvas></div></div>
+    ${g.fireball?`<div class="card"><h3>Fireball frequency</h3><div class="sub">The bonus Fireball digit.</div><div class="chartbox"><canvas id="c_fb"></canvas></div></div>`:``}
+    <div class="card full"><h3>Sum of digits</h3><div class="sub">Distribution of the digit total (0–${A.maxSum}).</div>
+      <div class="stat-row"><div class="stat"><div class="v">${A.avgSum.toFixed(1)}</div><div class="l">Average sum</div></div><div class="stat"><div class="v">${A.N}</div><div class="l">Draws</div></div></div>
+      <div class="chartbox" style="margin-top:14px"><canvas id="c_dsum"></canvas></div></div>
+    <div class="card"><h3>Number type</h3><div class="sub">Repeated-digit makeup of each draw.</div><div class="chartbox"><canvas id="c_type"></canvas></div></div>
+    <div class="card full"><h3>📈 Digit-sum trend over time</h3><div class="sub">Digit total per draw (faint) with a moving average (bold), oldest → newest.</div><div class="chartbox"><canvas id="c_dtrend"></canvas></div></div>
+    ${todCard}
+    <div class="card"><h3>Recent draws</h3><div class="sub">Most recent results.</div>
+      <table><thead><tr><th>Date</th><th>Draw</th><th>Digits</th><th>FB</th></tr></thead><tbody>
+      ${draws.slice(0,12).map(d=>`<tr><td>${d.d}</td><td>${d.t||''}</td><td class="num">${d.g.join(' ')}</td><td>${d.f??'—'}</td></tr>`).join("")}
+      </tbody></table></div>
+  </div>`;
+
+  // position frequency grouped bars
+  mk("c_pos",{type:"bar",data:{labels:[0,1,2,3,4,5,6,7,8,9],
+    datasets:A.posFreq.map((arr,i)=>({label:posLabels[i],data:arr,backgroundColor:palette(g.digitCount)[i]}))},
+    options:baseOpts({plugins:{legend:{labels:{color:TICK}},tooltip:{callbacks:{title:i=>"Digit "+i[0].label}}}})});
+  const dEx=[0,1,2,3,4,5,6,7,8,9].map(()=>A.expectedAll), dUp=dEx.map(v=>v+2*A.sdAll), dLo=dEx.map(v=>Math.max(0,v-2*A.sdAll));
+  mk("c_all",{type:"bar",data:{labels:[0,1,2,3,4,5,6,7,8,9],datasets:[
+    {type:"bar",label:"Times drawn",data:A.allFreq,backgroundColor:"rgba(74,163,255,.8)",order:3},
+    {type:"line",label:"±2σ random range",data:dUp,borderColor:"rgba(245,197,24,.45)",borderWidth:1,pointRadius:0,fill:"+1",backgroundColor:"rgba(245,197,24,.08)",order:1},
+    {type:"line",label:"_lower",data:dLo,borderColor:"rgba(245,197,24,.45)",borderWidth:1,pointRadius:0,fill:false,order:1},
+    {type:"line",label:"expected (chance)",data:dEx,borderColor:"rgba(255,255,255,.6)",borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false,order:0}
+  ]},options:baseOpts({plugins:{legend:{display:true,labels:{color:TICK,font:{size:9},filter:i=>i.text[0]!=="_"}},tooltip:{callbacks:{title:i=>"Digit "+i[0].label}}}})});
+  if(g.fireball)mk("c_fb",{type:"bar",data:{labels:[0,1,2,3,4,5,6,7,8,9],datasets:[{data:A.fFreq,backgroundColor:"rgba(245,197,24,.85)"}]},options:baseOpts({plugins:{legend:{display:false}}})});
+  // digit-sum trend
+  const dma=movAvg(A.digitSumSeries,Math.min(10,Math.max(2,Math.floor(A.N/6))));
+  mk("c_dtrend",{data:{labels:A.dateSeries,datasets:[
+    {type:"line",label:"Digit sum",data:A.digitSumSeries,borderColor:"rgba(74,163,255,.35)",pointRadius:0,borderWidth:1,fill:false},
+    {type:"line",label:"Moving average",data:dma,borderColor:"#f5c518",pointRadius:0,borderWidth:2,fill:false,tension:.2}
+  ]},options:baseOpts({scales:{x:{ticks:{color:TICK,maxTicksLimit:8},grid:{color:GRID}},y:{ticks:{color:TICK},grid:{color:GRID}}}})});
+  // midday vs evening (overall digit frequency)
+  if(daily){
+    const mid=digitFreqArray(draws.filter(d=>d.t==='midday')), eve=digitFreqArray(draws.filter(d=>d.t==='evening'));
+    mk("c_tod",{type:"bar",data:{labels:[0,1,2,3,4,5,6,7,8,9],datasets:[
+      {label:"Midday",data:mid,backgroundColor:"rgba(74,163,255,.8)"},
+      {label:"Evening",data:eve,backgroundColor:"rgba(245,197,24,.8)"}
+    ]},options:baseOpts({plugins:{tooltip:{callbacks:{title:i=>"Digit "+i[0].label}}}})});
+  }
+  mk("c_dsum",{type:"bar",data:{labels:A.sumArr.map((_,i)=>i),datasets:[{data:A.sumArr,backgroundColor:"rgba(63,185,80,.8)"}]},options:baseOpts({plugins:{legend:{display:false}}})});
+  const typeLabels=g.digitCount===3?["All different","Double","Triple"]:["All different","One pair","Two pair / trips+","Quad"];
+  const typeData=g.digitCount===3?[A.allDiff,A.doubles,A.triples]:[A.allDiff,A.doubles,A.triples,A.quads];
+  mk("c_type",{type:"doughnut",data:{labels:typeLabels,datasets:[{data:typeData,backgroundColor:palette(typeData.length)}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:TICK,font:{size:10}}}}}});
+  // consensus quick pick
+  const pickBtn=document.getElementById("pickBtn"),pickOut=document.getElementById("pickOut");
+  function doPick(){const p=consensusDigitPick(A,g);
+    pickOut.innerHTML=`<div class="balls">`+p.digits.map(d=>`<div class="ball digit">${d}</div>`).join("")+
+      (p.fb!=null?`<div class="ball special" title="Fireball">${p.fb}</div>`:``)+`</div>`;}
+  if(pickBtn){pickBtn.onclick=doPick;doPick();}
+}
+
+/* ---------- tabs & events ---------- */
+function buildTabs(){
+  const el=document.getElementById("tabs");
+  el.innerHTML=Object.keys(GAMES).map(k=>`<button class="tab ${k===state.game?'active':''}" data-k="${k}">${GAMES[k].name}</button>`).join("");
+  el.querySelectorAll(".tab").forEach(b=>b.onclick=()=>switchGame(b.dataset.k));
+}
+async function switchGame(k){
+  state.game=k;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.k===k));
+  document.getElementById("content").innerHTML=`<div class="loading"><div class="spinner"></div>Loading ${GAMES[k].name}…</div>`;
+  try{await getDraws(k);render();}
+  catch(e){document.getElementById("content").innerHTML=`<div class="err">Couldn't load ${GAMES[k].name} (${e.message}). Powerball & Mega Millions need an internet connection to reach the official results feed; Illinois games are built in and work offline.</div>`;}
+}
+document.getElementById("window").onchange=e=>{state.window=e.target.value;if(state.cache[state.game])render();};
+
+buildTabs();
+switchGame(state.game);
+</script>
+</body>
+</html>
