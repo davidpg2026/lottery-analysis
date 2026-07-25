@@ -19,8 +19,55 @@ const GAMES = {
   pick4:         {type:'digit', digits:4}               // 4 digits + Fireball
 };
 
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-           '(KHTML, like Gecko) Chrome/125.0 Safari/537.36';
+// Full browser-like headers (some sites 403 a bare request)
+const BROWSER = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
+                '(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Referer': 'https://www.illinoislottery.com/',
+  'Upgrade-Insecure-Requests': '1',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none'
+};
+
+// Try the site directly, then fall back through public read proxies.
+// Returns HTML that actually contains the results, or throws.
+async function fetchHtml(url) {
+  const attempts = [
+    async () => {                                   // 1) direct
+      const r = await fetch(url, {headers: BROWSER});
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return await r.text();
+    },
+    async () => {                                   // 2) allorigins (returns JSON {contents})
+      const r = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(url),
+                            {headers: {'User-Agent': BROWSER['User-Agent']}});
+      if (!r.ok) throw new Error('proxy HTTP ' + r.status);
+      const j = await r.json();
+      return (j && j.contents) || '';
+    },
+    async () => {                                   // 3) corsproxy (returns raw HTML)
+      const r = await fetch('https://corsproxy.io/?url=' + encodeURIComponent(url),
+                            {headers: BROWSER});
+      if (!r.ok) throw new Error('proxy HTTP ' + r.status);
+      return await r.text();
+    }
+  ];
+  let lastErr;
+  for (let i = 0; i < attempts.length; i++) {
+    try {
+      const html = await attempts[i]();
+      if (html && html.includes('/dbg/results/')) {
+        if (i > 0) console.log(`  (used fallback proxy #${i})`);
+        return html;
+      }
+      lastErr = new Error('response did not contain results');
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('all fetch strategies failed');
+}
 
 function parseLine(game, line) {
   const md = line.match(/([A-Z][a-z]{2}) (\d{1,2}), (\d{4})/);
@@ -48,11 +95,9 @@ function parseLine(game, line) {
 
 async function fetchGame(game) {
   const url = `https://www.illinoislottery.com/dbg/results/${game}`;
-  const res = await fetch(url, {headers:{'User-Agent':UA}});
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  const html = await res.text();
-  // Each result is an <a> link to /dbg/results/<game>/draw/<id>
-  const re = new RegExp(`/dbg/results/${game}/draw/\\d+"[^>]*>([\\s\\S]*?)</a>`, 'g');
+  const html = await fetchHtml(url);
+  // Each result is a link to /dbg/results/<game>/draw/<id>; capture the text after it.
+  const re = new RegExp(`/dbg/results/${game}/draw/\\d+"?[^>]*>([\\s\\S]*?)</a>`, 'g');
   const out = [];
   let m;
   while ((m = re.exec(html))) {
