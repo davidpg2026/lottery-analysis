@@ -431,6 +431,15 @@ function consensusDigitPick(A,g){
   const pick=arr=>{let tot=0;const ws=arr.map(v=>v+0.5);ws.forEach(w=>tot+=w);let r=Math.random()*tot;for(let i=0;i<10;i++){r-=ws[i];if(r<=0)return i;}return 9;};
   return {digits:A.posFreq.map(pf=>pick(pf)),fb:g.fireball?pick(A.fFreq):null};
 }
+/* Pure-random picks (no weighting at all) */
+function randomBallPick(A,g){
+  const pool=[];for(let n=1;n<=A.whiteMax;n++)pool.push(n);
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+  return {nums:pool.slice(0,g.whiteCount).sort((a,b)=>a-b), special:A.hasSpecial?1+Math.floor(Math.random()*A.specialMax):null};
+}
+function randomDigitPick(g){
+  return {digits:Array.from({length:g.digitCount},()=>Math.floor(Math.random()*10)), fb:g.fireball?Math.floor(Math.random()*10):null};
+}
 
 /* ============================================================
    RENDER HELPERS
@@ -566,7 +575,7 @@ function renderBall(g,all,draws){
 
   const matrixNote=A.excluded>0?`<div class="note">Matrix-adjusted: <b>${A.excluded}</b> older-format draw(s) excluded so they don't distort the current ${g.whiteCount}/${A.whiteMax}${A.hasSpecial?` + 1/${A.specialMax}`:''} matrix. Analyzing <b>${A.N}</b> in-matrix draws.</div>`:'';
   document.getElementById("content").innerHTML=shortWindowNote(all)+matrixNote+`<div class="grid">
-    <div class="card full" style="border-color:#5c4d1a"><h3>🎯 Consensus Quick Pick</h3><div class="sub">A combination assembled from this window's patterns — hot numbers, common companions, and the typical sum / odd-even / low-high profile. <b style="color:var(--accent)">For fun only: every combination has identical odds, and this does not improve your chances of winning.</b></div><div id="pickOut" style="margin-top:6px"></div><button id="pickBtn" class="tab" style="margin-top:12px">🎲 Generate a pick</button></div>
+    <div class="card full" style="border-color:#5c4d1a"><h3>🎯 Quick Pick</h3><div class="sub">Two ways to generate a set: <b>Consensus</b> draws on this window's patterns (hot numbers, common companions, typical sum / odd-even / low-high); <b>Pure random</b> picks with no weighting at all. <b style="color:var(--accent)">For fun only: every combination has identical odds either way, and neither improves your chances of winning.</b></div><div id="pickOut" style="margin-top:6px"></div><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button id="pickBtn" class="tab">🎯 Consensus pick</button><button id="pickRnd" class="tab">🎰 Pure random</button></div></div>
     <div class="card full"><h3>🎟️ Check your ticket</h3><div class="sub">Enter your ${g.whiteCount} numbers to see how they'd have done against every past ${g.name} draw. <b style="color:var(--accent)">For fun only — to claim a real prize you must verify with the official Illinois Lottery.</b></div>
       <div class="tkline"><input id="tkNums" placeholder="${g.whiteCount} numbers 1–${A.whiteMax}, e.g. ${latest.n.map(pad2).join(' ')}" style="flex:1;min-width:200px">${A.hasSpecial?`<input id="tkSpec" placeholder="${g.specialName} 1–${A.specialMax}" style="width:130px">`:''}<button id="tkBtn" class="tab">Check</button></div>
       <div id="tkOut"></div></div>
@@ -660,11 +669,14 @@ function renderBall(g,all,draws){
   }
   if(selEl){selEl.onchange=e=>showCompanions(+e.target.value);showCompanions(+selEl.value);}
   // consensus quick pick
-  const pickBtn=document.getElementById("pickBtn"),pickOut=document.getElementById("pickOut");
-  function doPick(){const p=consensusBallPick(A,g);
-    pickOut.innerHTML=ballRow(p.nums.map(n=>({n})),'',false)+
+  const pickBtn=document.getElementById("pickBtn"),pickRnd=document.getElementById("pickRnd"),pickOut=document.getElementById("pickOut");
+  function showBall(p,label){
+    pickOut.innerHTML=`<div style="font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${label}</div>`+
+      ballRow(p.nums.map(n=>({n})),'',false)+
       (p.special!=null?`<div style="margin-top:8px;font-size:.82rem;color:var(--muted)">${g.specialName}: <b style="color:var(--accent)">${String(p.special).padStart(2,'0')}</b></div>`:'');}
-  if(pickBtn){pickBtn.onclick=doPick;doPick();}
+  if(pickBtn)pickBtn.onclick=()=>showBall(consensusBallPick(A,g),'Consensus pick');
+  if(pickRnd)pickRnd.onclick=()=>showBall(randomBallPick(A,g),'Pure random');
+  showBall(consensusBallPick(A,g),'Consensus pick');
   // ticket checker
   const tkBtn=document.getElementById('tkBtn');
   if(tkBtn)tkBtn.onclick=()=>{
@@ -720,7 +732,7 @@ function renderDigit(g,all,draws){
   const daily=draws.some(d=>d.t==='midday')&&draws.some(d=>d.t==='evening');
   const todCard=daily?`<div class="card full"><h3>🕐 Midday vs evening</h3><div class="sub">Overall digit frequency split by draw time.</div><div class="chartbox"><canvas id="c_tod"></canvas></div></div>`:``;
   document.getElementById("content").innerHTML=shortWindowNote(all)+`<div class="grid">
-    <div class="card full" style="border-color:#5c4d1a"><h3>🎯 Consensus Quick Pick</h3><div class="sub">Digits drawn from each position's historical frequency, plus a Fireball. <b style="color:var(--accent)">For fun only: draws are random and this does not improve your odds.</b></div><div id="pickOut" style="margin-top:6px"></div><button id="pickBtn" class="tab" style="margin-top:12px">🎲 Generate a pick</button></div>
+    <div class="card full" style="border-color:#5c4d1a"><h3>🎯 Quick Pick</h3><div class="sub"><b>Consensus</b> draws each digit from its position's historical frequency; <b>Pure random</b> uses no weighting. <b style="color:var(--accent)">For fun only: draws are random and neither option improves your odds.</b></div><div id="pickOut" style="margin-top:6px"></div><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button id="pickBtn" class="tab">🎯 Consensus pick</button><button id="pickRnd" class="tab">🎰 Pure random</button></div></div>
     <div class="card full"><h3>🎟️ Check your ticket</h3><div class="sub">Enter your ${g.digitCount} digits to see how they'd have done against every past ${g.name} draw. <b style="color:var(--accent)">For fun only — verify with the official Illinois Lottery to claim a prize.</b></div>
       <div class="tkline"><input id="tkNums" placeholder="${g.digitCount} digits 0–9, e.g. ${latest.g.join(' ')}" style="flex:1;min-width:180px"><button id="tkBtn" class="tab">Check</button></div>
       <div id="tkOut"></div></div>
@@ -774,11 +786,14 @@ function renderDigit(g,all,draws){
   const typeData=g.digitCount===3?[A.allDiff,A.doubles,A.triples]:[A.allDiff,A.doubles,A.triples,A.quads];
   mk("c_type",{type:"doughnut",data:{labels:typeLabels,datasets:[{data:typeData,backgroundColor:palette(typeData.length)}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:TICK,font:{size:10}}}}}});
   // consensus quick pick
-  const pickBtn=document.getElementById("pickBtn"),pickOut=document.getElementById("pickOut");
-  function doPick(){const p=consensusDigitPick(A,g);
-    pickOut.innerHTML=`<div class="balls">`+p.digits.map(d=>`<div class="ball digit">${d}</div>`).join("")+
+  const pickBtn=document.getElementById("pickBtn"),pickRnd=document.getElementById("pickRnd"),pickOut=document.getElementById("pickOut");
+  function showDig(p,label){
+    pickOut.innerHTML=`<div style="font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${label}</div><div class="balls">`+
+      p.digits.map(d=>`<div class="ball digit">${d}</div>`).join("")+
       (p.fb!=null?`<div class="ball special" title="Fireball">${p.fb}</div>`:``)+`</div>`;}
-  if(pickBtn){pickBtn.onclick=doPick;doPick();}
+  if(pickBtn)pickBtn.onclick=()=>showDig(consensusDigitPick(A,g),'Consensus pick');
+  if(pickRnd)pickRnd.onclick=()=>showDig(randomDigitPick(g),'Pure random');
+  showDig(consensusDigitPick(A,g),'Consensus pick');
   // ticket checker
   const tkBtn=document.getElementById('tkBtn');
   if(tkBtn)tkBtn.onclick=()=>{
