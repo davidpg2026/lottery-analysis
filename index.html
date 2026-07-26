@@ -29,8 +29,15 @@
   .tab.active{background:var(--accent);color:#111;border-color:var(--accent);font-weight:600}
   .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center;margin:14px 0 4px}
   .controls label{color:var(--muted);font-size:.85rem}
-  select{background:var(--panel2);color:var(--text);border:1px solid var(--border);
-    border-radius:8px;padding:7px 12px;font-size:.88rem}
+  select,input{background:var(--panel2);color:var(--text);border:1px solid var(--border);
+    border-radius:8px;padding:7px 12px;font-size:.88rem;font-family:inherit}
+  input::placeholder{color:#6b7785}
+  .tkline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .tkres{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:.9rem;margin-top:10px}
+  .tkres b{color:var(--accent)}
+  .pager{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:10px;color:var(--muted);font-size:.82rem}
+  .pager button{cursor:pointer}
+  .histwrap{max-height:420px;overflow:auto}
   .status{text-align:center;color:var(--muted);font-size:.83rem;margin:8px 0 16px}
   .status b{color:var(--text)}
   .pill{display:inline-block;background:var(--panel2);border:1px solid var(--border);
@@ -117,536 +124,59 @@
    ============================================================ */
 /* IL_DATA_START */
 const IL_DATA = {
-  "lotto": {
-    "seededThrough": "2026-07-20",
-    "draws": [
-      {
-        "d": "2026-07-20",
-        "n": [
-          4,
-          7,
-          20,
-          21,
-          41,
-          48
-        ],
-        "s": 4
-      },
-      {
-        "d": "2026-07-18",
-        "n": [
-          17,
-          26,
-          28,
-          35,
-          41,
-          42
-        ],
-        "s": 15
-      },
-      {
-        "d": "2026-07-16",
-        "n": [
-          11,
-          19,
-          25,
-          33,
-          35,
-          38
-        ],
-        "s": 23
-      },
-      {
-        "d": "2026-07-13",
-        "n": [
-          10,
-          15,
-          20,
-          23,
-          24,
-          30
-        ],
-        "s": 9
-      },
-      {
-        "d": "2026-07-11",
-        "n": [
-          20,
-          23,
-          30,
-          32,
-          46,
-          49
-        ],
-        "s": 21
-      },
-      {
-        "d": "2026-07-09",
-        "n": [
-          5,
-          13,
-          20,
-          28,
-          32,
-          49
-        ],
-        "s": 23
-      },
-      {
-        "d": "2026-07-06",
-        "n": [
-          5,
-          9,
-          11,
-          14,
-          21,
-          36
-        ],
-        "s": 15
-      },
-      {
-        "d": "2026-07-04",
-        "n": [
-          8,
-          9,
-          10,
-          17,
-          26,
-          38
-        ],
-        "s": 19
-      },
-      {
-        "d": "2026-07-02",
-        "n": [
-          6,
-          12,
-          13,
-          32,
-          33,
-          34
-        ],
-        "s": 20
-      },
-      {
-        "d": "2026-06-29",
-        "n": [
-          8,
-          16,
-          19,
-          32,
-          36,
-          38
-        ],
-        "s": 19
-      }
-    ]
-  },
-  "luckydaylotto": {
-    "seededThrough": "2026-07-24",
-    "draws": [
-      {
-        "d": "2026-07-24",
-        "t": "midday",
-        "n": [
-          7,
-          14,
-          16,
-          20,
-          30
-        ],
-        "s": null
-      },
-      {
-        "d": "2026-07-23",
-        "t": "evening",
-        "n": [
-          9,
-          25,
-          37,
-          42,
-          45
-        ],
-        "s": null
-      },
-      {
-        "d": "2026-07-23",
-        "t": "midday",
-        "n": [
-          2,
-          6,
-          16,
-          18,
-          24
-        ],
-        "s": null
-      },
-      {
-        "d": "2026-07-22",
-        "t": "evening",
-        "n": [
-          4,
-          18,
-          19,
-          27,
-          33
-        ],
-        "s": null
-      },
-      {
-        "d": "2026-07-22",
-        "t": "midday",
-        "n": [
-          8,
-          18,
-          36,
-          39,
-          44
-        ],
-        "s": null
-      },
-      {
-        "d": "2026-07-21",
-        "t": "evening",
-        "n": [
-          11,
-          20,
-          31,
-          34,
-          43
-        ],
-        "s": null
-      },
-      {
-        "d": "2026-07-21",
-        "t": "midday",
-        "n": [
-          12,
-          21,
-          25,
-          37,
-          40
-        ],
-        "s": null
-      },
-      {
-        "d": "2026-07-20",
-        "t": "evening",
-        "n": [
-          8,
-          16,
-          19,
-          34,
-          45
-        ],
-        "s": null
-      },
-      {
-        "d": "2026-07-20",
-        "t": "midday",
-        "n": [
-          2,
-          8,
-          22,
-          24,
-          29
-        ],
-        "s": null
-      },
-      {
-        "d": "2026-07-19",
-        "t": "evening",
-        "n": [
-          9,
-          13,
-          25,
-          26,
-          34
-        ],
-        "s": null
-      },
-      {
-        "d": "2026-07-19",
-        "t": "midday",
-        "n": [
-          3,
-          11,
-          19,
-          21,
-          44
-        ],
-        "s": null
-      },
-      {
-        "d": "2026-07-18",
-        "t": "evening",
-        "n": [
-          6,
-          21,
-          26,
-          28,
-          44
-        ],
-        "s": null
-      },
-      {
-        "d": "2026-07-18",
-        "t": "midday",
-        "n": [
-          6,
-          15,
-          17,
-          35,
-          37
-        ],
-        "s": null
-      },
-      {
-        "d": "2026-07-17",
-        "t": "evening",
-        "n": [
-          8,
-          28,
-          32,
-          40,
-          41
-        ],
-        "s": null
-      },
-      {
-        "d": "2026-07-17",
-        "t": "midday",
-        "n": [
-          6,
-          7,
-          9,
-          20,
-          34
-        ],
-        "s": null
-      }
-    ]
-  },
-  "pick3": {
-    "seededThrough": "2026-07-23",
-    "draws": [
-      {
-        "d": "2026-07-23",
-        "t": "evening",
-        "g": [
-          5,
-          0,
-          6
-        ],
-        "f": 3
-      },
-      {
-        "d": "2026-07-23",
-        "t": "midday",
-        "g": [
-          0,
-          3,
-          7
-        ],
-        "f": 8
-      },
-      {
-        "d": "2026-07-22",
-        "t": "evening",
-        "g": [
-          1,
-          6,
-          6
-        ],
-        "f": 2
-      },
-      {
-        "d": "2026-07-22",
-        "t": "midday",
-        "g": [
-          2,
-          8,
-          1
-        ],
-        "f": 0
-      },
-      {
-        "d": "2026-07-21",
-        "t": "evening",
-        "g": [
-          9,
-          6,
-          8
-        ],
-        "f": 6
-      },
-      {
-        "d": "2026-07-21",
-        "t": "midday",
-        "g": [
-          5,
-          4,
-          0
-        ],
-        "f": 9
-      },
-      {
-        "d": "2026-07-20",
-        "t": "evening",
-        "g": [
-          2,
-          3,
-          8
-        ],
-        "f": 2
-      },
-      {
-        "d": "2026-07-20",
-        "t": "midday",
-        "g": [
-          1,
-          3,
-          0
-        ],
-        "f": 0
-      },
-      {
-        "d": "2026-07-19",
-        "t": "evening",
-        "g": [
-          5,
-          4,
-          1
-        ],
-        "f": 6
-      },
-      {
-        "d": "2026-07-19",
-        "t": "midday",
-        "g": [
-          4,
-          6,
-          2
-        ],
-        "f": 1
-      }
-    ]
-  },
-  "pick4": {
-    "seededThrough": "2026-07-22",
-    "draws": [
-      {
-        "d": "2026-07-22",
-        "t": "evening",
-        "g": [
-          1,
-          3,
-          1,
-          2
-        ],
-        "f": 8
-      },
-      {
-        "d": "2026-07-22",
-        "t": "midday",
-        "g": [
-          6,
-          0,
-          7,
-          1
-        ],
-        "f": 9
-      },
-      {
-        "d": "2026-07-21",
-        "t": "evening",
-        "g": [
-          0,
-          6,
-          2,
-          3
-        ],
-        "f": 3
-      },
-      {
-        "d": "2026-07-21",
-        "t": "midday",
-        "g": [
-          3,
-          6,
-          8,
-          6
-        ],
-        "f": 7
-      },
-      {
-        "d": "2026-07-20",
-        "t": "evening",
-        "g": [
-          9,
-          1,
-          5,
-          0
-        ],
-        "f": 6
-      },
-      {
-        "d": "2026-07-20",
-        "t": "midday",
-        "g": [
-          1,
-          1,
-          5,
-          9
-        ],
-        "f": 1
-      },
-      {
-        "d": "2026-07-19",
-        "t": "evening",
-        "g": [
-          3,
-          4,
-          3,
-          7
-        ],
-        "f": 0
-      },
-      {
-        "d": "2026-07-19",
-        "t": "midday",
-        "g": [
-          6,
-          1,
-          1,
-          8
-        ],
-        "f": 3
-      },
-      {
-        "d": "2026-07-18",
-        "t": "evening",
-        "g": [
-          2,
-          2,
-          6,
-          2
-        ],
-        "f": 2
-      },
-      {
-        "d": "2026-07-18",
-        "t": "midday",
-        "g": [
-          5,
-          3,
-          5,
-          4
-        ],
-        "f": 9
-      }
-    ]
-  }
+  "lotto": { "seededThrough":"2026-07-20", "draws":[
+    {"d":"2026-07-20","n":[4,7,20,21,41,48],"s":4},
+    {"d":"2026-07-18","n":[17,26,28,35,41,42],"s":15},
+    {"d":"2026-07-16","n":[11,19,25,33,35,38],"s":23},
+    {"d":"2026-07-13","n":[10,15,20,23,24,30],"s":9},
+    {"d":"2026-07-11","n":[20,23,30,32,46,49],"s":21},
+    {"d":"2026-07-09","n":[5,13,20,28,32,49],"s":23},
+    {"d":"2026-07-06","n":[5,9,11,14,21,36],"s":15},
+    {"d":"2026-07-04","n":[8,9,10,17,26,38],"s":19},
+    {"d":"2026-07-02","n":[6,12,13,32,33,34],"s":20},
+    {"d":"2026-06-29","n":[8,16,19,32,36,38],"s":19}
+  ]},
+  "luckydaylotto": { "seededThrough":"2026-07-24", "draws":[
+    {"d":"2026-07-24","t":"midday","n":[7,14,16,20,30],"s":null},
+    {"d":"2026-07-23","t":"evening","n":[9,25,37,42,45],"s":null},
+    {"d":"2026-07-23","t":"midday","n":[2,6,16,18,24],"s":null},
+    {"d":"2026-07-22","t":"evening","n":[4,18,19,27,33],"s":null},
+    {"d":"2026-07-22","t":"midday","n":[8,18,36,39,44],"s":null},
+    {"d":"2026-07-21","t":"evening","n":[11,20,31,34,43],"s":null},
+    {"d":"2026-07-21","t":"midday","n":[12,21,25,37,40],"s":null},
+    {"d":"2026-07-20","t":"evening","n":[8,16,19,34,45],"s":null},
+    {"d":"2026-07-20","t":"midday","n":[2,8,22,24,29],"s":null},
+    {"d":"2026-07-19","t":"evening","n":[9,13,25,26,34],"s":null},
+    {"d":"2026-07-19","t":"midday","n":[3,11,19,21,44],"s":null},
+    {"d":"2026-07-18","t":"evening","n":[6,21,26,28,44],"s":null},
+    {"d":"2026-07-18","t":"midday","n":[6,15,17,35,37],"s":null},
+    {"d":"2026-07-17","t":"evening","n":[8,28,32,40,41],"s":null},
+    {"d":"2026-07-17","t":"midday","n":[6,7,9,20,34],"s":null}
+  ]},
+  "pick3": { "seededThrough":"2026-07-23", "draws":[
+    {"d":"2026-07-23","t":"evening","g":[5,0,6],"f":3},
+    {"d":"2026-07-23","t":"midday","g":[0,3,7],"f":8},
+    {"d":"2026-07-22","t":"evening","g":[1,6,6],"f":2},
+    {"d":"2026-07-22","t":"midday","g":[2,8,1],"f":0},
+    {"d":"2026-07-21","t":"evening","g":[9,6,8],"f":6},
+    {"d":"2026-07-21","t":"midday","g":[5,4,0],"f":9},
+    {"d":"2026-07-20","t":"evening","g":[2,3,8],"f":2},
+    {"d":"2026-07-20","t":"midday","g":[1,3,0],"f":0},
+    {"d":"2026-07-19","t":"evening","g":[5,4,1],"f":6},
+    {"d":"2026-07-19","t":"midday","g":[4,6,2],"f":1}
+  ]},
+  "pick4": { "seededThrough":"2026-07-22", "draws":[
+    {"d":"2026-07-22","t":"evening","g":[1,3,1,2],"f":8},
+    {"d":"2026-07-22","t":"midday","g":[6,0,7,1],"f":9},
+    {"d":"2026-07-21","t":"evening","g":[0,6,2,3],"f":3},
+    {"d":"2026-07-21","t":"midday","g":[3,6,8,6],"f":7},
+    {"d":"2026-07-20","t":"evening","g":[9,1,5,0],"f":6},
+    {"d":"2026-07-20","t":"midday","g":[1,1,5,9],"f":1},
+    {"d":"2026-07-19","t":"evening","g":[3,4,3,7],"f":0},
+    {"d":"2026-07-19","t":"midday","g":[6,1,1,8],"f":3},
+    {"d":"2026-07-18","t":"evening","g":[2,2,6,2],"f":2},
+    {"d":"2026-07-18","t":"midday","g":[5,3,5,4],"f":9}
+  ]}
 };
 /* IL_DATA_END */
 
@@ -916,6 +446,82 @@ function ballRow(items,cls,withCount){
     `<div class="ball ${cls||''}">${String(it.n).padStart(2,'0')}`+
     (withCount?`<span class="cnt">${it.count}×</span>`:``)+`</div>`).join("")+`</div>`;}
 function palette(k){const p=[];for(let i=0;i<k;i++){const h=Math.round(210-(i/((k-1)||1))*210);p.push(`hsl(${h},70%,58%)`);}return p;}
+function pad2(n){return String(n).padStart(2,'0');}
+
+/* ---- CSV export ---- */
+function downloadCSV(name,text){
+  const blob=new Blob([text],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
+function csvText(g,all){
+  if(g.type==='ball'){
+    const head=['Date',(all.some(d=>d.t)?'Draw':null),'Numbers',(g.specialName||null)].filter(Boolean);
+    const rows=all.map(d=>[d.d,(all.some(x=>x.t)?(d.t||''):null),d.n.map(pad2).join(' '),(g.specialName?(d.s==null?'':pad2(d.s)):null)].filter(x=>x!==null));
+    return [head].concat(rows).map(r=>r.join(',')).join('\n');
+  }else{
+    const rows=all.map(d=>[d.d,d.t||'',d.g.join(' '),(d.f==null?'':d.f)]);
+    return [['Date','Draw','Digits','Fireball']].concat(rows).map(r=>r.join(',')).join('\n');
+  }
+}
+
+/* ---- ticket checking ---- */
+function sameMulti(a,b){if(a.length!==b.length)return false;const s=[...a].sort().join(',');return s===[...b].sort().join(',');}
+function checkBallTicket(all,g,whites,special){
+  const latest=all[0];
+  const latestHit=whites.filter(n=>latest.n.includes(n));
+  const latestSpec=(special!=null)&&(latest.s===special);
+  let full=0,best=-1,bestDates=[];
+  all.forEach(d=>{
+    const mc=whites.filter(n=>d.n.includes(n)).length;
+    if(mc>best){best=mc;bestDates=[d.d];}else if(mc===best&&bestDates.length<3)bestDates.push(d.d);
+    const specOk=(special==null)?true:(d.s===special);
+    if(mc===g.whiteCount&&specOk)full++;
+  });
+  return {latest,latestHit,latestSpec,best,bestDates,full,hasSpecial:g.specialName!=null&&special!=null};
+}
+function checkDigitTicket(all,g,digits,fb){
+  const latest=all[0];
+  const straightLatest=latest.g.join('')===digits.join('');
+  const boxLatest=sameMulti(latest.g,digits);
+  const fbLatest=(fb!=null)&&(latest.f===fb);
+  let straight=0,box=0;
+  all.forEach(d=>{if(d.g.join('')===digits.join(''))straight++;if(sameMulti(d.g,digits))box++;});
+  return {latest,straightLatest,boxLatest,fbLatest,straight,box};
+}
+
+/* ---- searchable / paginated draw-history table ---- */
+function wireHistory(g,all){
+  const per=25; let page=0, q='';
+  const searchEl=document.getElementById('histSearch');
+  const tableEl=document.getElementById('histTable');
+  const pagerEl=document.getElementById('histPager');
+  const csvEl=document.getElementById('histCsv');
+  if(!tableEl)return;
+  const rowText=d=> g.type==='ball'
+    ? `${d.d} ${d.t||''} ${d.n.map(pad2).join(' ')} ${d.s!=null?pad2(d.s):''}`
+    : `${d.d} ${d.t||''} ${d.g.join('')} ${d.f??''}`;
+  function filtered(){ if(!q)return all; const s=q.toLowerCase(); return all.filter(d=>rowText(d).toLowerCase().includes(s)); }
+  function draw(){
+    const list=filtered(); const pages=Math.max(1,Math.ceil(list.length/per));
+    if(page>=pages)page=pages-1; if(page<0)page=0;
+    const slice=list.slice(page*per,page*per+per);
+    const head=g.type==='ball'
+      ? `<tr><th>Date</th>${all.some(d=>d.t)?'<th>Draw</th>':''}<th>Numbers</th>${g.specialName?`<th>${g.specialName}</th>`:''}</tr>`
+      : `<tr><th>Date</th><th>Draw</th><th>Digits</th><th>FB</th></tr>`;
+    const body=slice.map(d=> g.type==='ball'
+      ? `<tr><td>${d.d}</td>${all.some(x=>x.t)?`<td>${d.t||''}</td>`:''}<td class="num">${d.n.map(pad2).join(' ')}</td>${g.specialName?`<td>${d.s!=null?pad2(d.s):'—'}</td>`:''}</tr>`
+      : `<tr><td>${d.d}</td><td>${d.t||''}</td><td class="num">${d.g.join(' ')}</td><td>${d.f??'—'}</td></tr>`).join('');
+    tableEl.innerHTML=`<div class="histwrap"><table><thead>${head}</thead><tbody>${body||`<tr><td colspan="4" style="color:var(--muted)">No matches.</td></tr>`}</tbody></table></div>`;
+    pagerEl.innerHTML=`<button class="tab" id="hPrev" ${page===0?'disabled':''}>‹ Prev</button><span>${list.length} draws · page ${page+1} of ${pages}</span><button class="tab" id="hNext" ${page>=pages-1?'disabled':''}>Next ›</button>`;
+    const pv=document.getElementById('hPrev'),nx=document.getElementById('hNext');
+    if(pv)pv.onclick=()=>{page--;draw();}; if(nx)nx.onclick=()=>{page++;draw();};
+  }
+  if(searchEl)searchEl.oninput=e=>{q=e.target.value;page=0;draw();};
+  if(csvEl)csvEl.onclick=()=>downloadCSV(`${g.key||state.game}_history.csv`,csvText(g,all));
+  draw();
+}
 
 /* ---------- render dispatch ---------- */
 function render(){
@@ -961,6 +567,9 @@ function renderBall(g,all,draws){
   const matrixNote=A.excluded>0?`<div class="note">Matrix-adjusted: <b>${A.excluded}</b> older-format draw(s) excluded so they don't distort the current ${g.whiteCount}/${A.whiteMax}${A.hasSpecial?` + 1/${A.specialMax}`:''} matrix. Analyzing <b>${A.N}</b> in-matrix draws.</div>`:'';
   document.getElementById("content").innerHTML=shortWindowNote(all)+matrixNote+`<div class="grid">
     <div class="card full" style="border-color:#5c4d1a"><h3>🎯 Consensus Quick Pick</h3><div class="sub">A combination assembled from this window's patterns — hot numbers, common companions, and the typical sum / odd-even / low-high profile. <b style="color:var(--accent)">For fun only: every combination has identical odds, and this does not improve your chances of winning.</b></div><div id="pickOut" style="margin-top:6px"></div><button id="pickBtn" class="tab" style="margin-top:12px">🎲 Generate a pick</button></div>
+    <div class="card full"><h3>🎟️ Check your ticket</h3><div class="sub">Enter your ${g.whiteCount} numbers to see how they'd have done against every past ${g.name} draw. <b style="color:var(--accent)">For fun only — to claim a real prize you must verify with the official Illinois Lottery.</b></div>
+      <div class="tkline"><input id="tkNums" placeholder="${g.whiteCount} numbers 1–${A.whiteMax}, e.g. ${latest.n.map(pad2).join(' ')}" style="flex:1;min-width:200px">${A.hasSpecial?`<input id="tkSpec" placeholder="${g.specialName} 1–${A.specialMax}" style="width:130px">`:''}<button id="tkBtn" class="tab">Check</button></div>
+      <div id="tkOut"></div></div>
     <div class="card full"><h3>Number frequency vs random chance</h3><div class="sub">Bars = times drawn (red above average). The dashed line is the count expected from pure chance, and the shaded band is the normal ±2σ range of random variation — bars inside it are indistinguishable from randomness.</div><div class="chartbox tall"><canvas id="c_wfreq"></canvas></div></div>
     <div class="card"><h3>🎲 Randomness test (χ²)</h3><div class="sub">Chi-square goodness-of-fit against a perfectly uniform machine. A high p-value means the results are indistinguishable from true randomness.</div>
       <div class="stat-row" style="flex-direction:column">
@@ -1008,6 +617,9 @@ function renderBall(g,all,draws){
     <div class="card full"><h3>📈 Sum trend over time</h3><div class="sub">Sum of each draw (faint) with a moving average (bold), oldest → newest. Trend lines drift around the average with no lasting direction — the hallmark of randomness.</div><div class="chartbox"><canvas id="c_trend"></canvas></div></div>
     ${todCard}
     <div class="card full"><h3>📅 Draw activity by year</h3><div class="sub">Drawings recorded per year in this window.</div><div class="chartbox"><canvas id="c_year"></canvas></div></div>
+    <div class="card full"><h3>📜 Draw history</h3><div class="sub">Every ${g.name} draw available, newest first. Search by date or number, or download the full set as CSV.</div>
+      <div class="tkline" style="margin-bottom:10px"><input id="histSearch" placeholder="Search (e.g. 2024-05 or 23)" style="flex:1;min-width:180px"><button id="histCsv" class="tab">⬇ CSV</button></div>
+      <div id="histTable"></div><div class="pager" id="histPager"></div></div>
   </div>`;
 
   // charts
@@ -1053,6 +665,23 @@ function renderBall(g,all,draws){
     pickOut.innerHTML=ballRow(p.nums.map(n=>({n})),'',false)+
       (p.special!=null?`<div style="margin-top:8px;font-size:.82rem;color:var(--muted)">${g.specialName}: <b style="color:var(--accent)">${String(p.special).padStart(2,'0')}</b></div>`:'');}
   if(pickBtn){pickBtn.onclick=doPick;doPick();}
+  // ticket checker
+  const tkBtn=document.getElementById('tkBtn');
+  if(tkBtn)tkBtn.onclick=()=>{
+    const out=document.getElementById('tkOut');
+    const raw=(document.getElementById('tkNums').value.match(/\d+/g)||[]).map(Number);
+    const specEl=document.getElementById('tkSpec');
+    const spec=specEl&&specEl.value.trim()!==''?parseInt(specEl.value,10):null;
+    const uniq=[...new Set(raw)];
+    if(uniq.length!==g.whiteCount||uniq.some(n=>n<1||n>A.whiteMax)){
+      out.innerHTML=`<div class="tkres">Please enter exactly ${g.whiteCount} different numbers between 1 and ${A.whiteMax}.</div>`;return;}
+    if(A.hasSpecial&&spec!=null&&(spec<1||spec>A.specialMax)){
+      out.innerHTML=`<div class="tkres">${g.specialName} must be between 1 and ${A.specialMax}.</div>`;return;}
+    const r=checkBallTicket(all,g,uniq,spec);
+    const specTxt=r.hasSpecial?(r.latestSpec?`, plus the ${g.specialName} ✅`:` (${g.specialName} not matched)`):'';
+    out.innerHTML=`<div class="tkres">Against the latest draw (<b>${r.latest.d}</b>: ${r.latest.n.map(pad2).join(' ')}${r.latest.s!=null?` + ${pad2(r.latest.s)}`:''}) you matched <b>${r.latestHit.length} of ${g.whiteCount}</b>${r.latestHit.length?` — ${r.latestHit.map(pad2).join(' ')}`:''}${specTxt}.<br>Across all <b>${all.length}</b> recorded draws, your best was <b>${r.best} of ${g.whiteCount}</b> (${r.bestDates.join(', ')})${r.full?`, and every number matched on <b>${r.full}</b> draw(s)`:''}.<div style="color:var(--muted);font-size:.8rem;margin-top:6px">Curiosity check only — not an official prize verification.</div></div>`;
+  };
+  wireHistory(g,all);
   // sum histogram with fitted normal curve
   const binW=(g.whiteCount*A.whiteMax-g.whiteCount)/12;
   const normOverlay=A.sumHist.labels.map(lb=>{const parts=lb.split("–");const c=(+parts[0]+ +parts[1])/2;return normalPdf(c,A.sumMean,A.sumSd)*A.N*binW;});
@@ -1092,6 +721,9 @@ function renderDigit(g,all,draws){
   const todCard=daily?`<div class="card full"><h3>🕐 Midday vs evening</h3><div class="sub">Overall digit frequency split by draw time.</div><div class="chartbox"><canvas id="c_tod"></canvas></div></div>`:``;
   document.getElementById("content").innerHTML=shortWindowNote(all)+`<div class="grid">
     <div class="card full" style="border-color:#5c4d1a"><h3>🎯 Consensus Quick Pick</h3><div class="sub">Digits drawn from each position's historical frequency, plus a Fireball. <b style="color:var(--accent)">For fun only: draws are random and this does not improve your odds.</b></div><div id="pickOut" style="margin-top:6px"></div><button id="pickBtn" class="tab" style="margin-top:12px">🎲 Generate a pick</button></div>
+    <div class="card full"><h3>🎟️ Check your ticket</h3><div class="sub">Enter your ${g.digitCount} digits to see how they'd have done against every past ${g.name} draw. <b style="color:var(--accent)">For fun only — verify with the official Illinois Lottery to claim a prize.</b></div>
+      <div class="tkline"><input id="tkNums" placeholder="${g.digitCount} digits 0–9, e.g. ${latest.g.join(' ')}" style="flex:1;min-width:180px"><button id="tkBtn" class="tab">Check</button></div>
+      <div id="tkOut"></div></div>
     <div class="card full"><h3>Digit frequency by position</h3><div class="sub">How often each digit 0–9 landed in each position. In a fair game all bars trend toward equal over time.</div><div class="chartbox tall"><canvas id="c_pos"></canvas></div></div>
     <div class="card"><h3>Overall digit frequency vs chance</h3><div class="sub">All positions combined. Dashed line = expected from chance; shaded band = ±2σ random range.</div><div class="chartbox"><canvas id="c_all"></canvas></div></div>
     <div class="card"><h3>🎲 Randomness test (χ²)</h3><div class="sub">Chi-square goodness-of-fit of the digit frequencies against a perfectly uniform draw.</div>
@@ -1106,10 +738,9 @@ function renderDigit(g,all,draws){
     <div class="card"><h3>Number type</h3><div class="sub">Repeated-digit makeup of each draw.</div><div class="chartbox"><canvas id="c_type"></canvas></div></div>
     <div class="card full"><h3>📈 Digit-sum trend over time</h3><div class="sub">Digit total per draw (faint) with a moving average (bold), oldest → newest.</div><div class="chartbox"><canvas id="c_dtrend"></canvas></div></div>
     ${todCard}
-    <div class="card"><h3>Recent draws</h3><div class="sub">Most recent results.</div>
-      <table><thead><tr><th>Date</th><th>Draw</th><th>Digits</th><th>FB</th></tr></thead><tbody>
-      ${draws.slice(0,12).map(d=>`<tr><td>${d.d}</td><td>${d.t||''}</td><td class="num">${d.g.join(' ')}</td><td>${d.f??'—'}</td></tr>`).join("")}
-      </tbody></table></div>
+    <div class="card full"><h3>📜 Draw history</h3><div class="sub">Every ${g.name} draw available, newest first. Search by date or digits, or download the full set as CSV.</div>
+      <div class="tkline" style="margin-bottom:10px"><input id="histSearch" placeholder="Search (e.g. 2024-05 or 744)" style="flex:1;min-width:180px"><button id="histCsv" class="tab">⬇ CSV</button></div>
+      <div id="histTable"></div><div class="pager" id="histPager"></div></div>
   </div>`;
 
   // position frequency grouped bars
@@ -1148,6 +779,17 @@ function renderDigit(g,all,draws){
     pickOut.innerHTML=`<div class="balls">`+p.digits.map(d=>`<div class="ball digit">${d}</div>`).join("")+
       (p.fb!=null?`<div class="ball special" title="Fireball">${p.fb}</div>`:``)+`</div>`;}
   if(pickBtn){pickBtn.onclick=doPick;doPick();}
+  // ticket checker
+  const tkBtn=document.getElementById('tkBtn');
+  if(tkBtn)tkBtn.onclick=()=>{
+    const out=document.getElementById('tkOut');
+    const raw=(document.getElementById('tkNums').value.match(/\d/g)||[]).map(Number);
+    if(raw.length!==g.digitCount){out.innerHTML=`<div class="tkres">Please enter exactly ${g.digitCount} digits (0–9).</div>`;return;}
+    const r=checkDigitTicket(all,g,raw,null);
+    const verdict=r.straightLatest?'exact (straight) match! 🎉':(r.boxLatest?'box match — right digits, different order':'no match');
+    out.innerHTML=`<div class="tkres">Against the latest draw (<b>${r.latest.d}</b> ${r.latest.t||''}: ${r.latest.g.join(' ')}): <b>${verdict}</b>.<br>Across all <b>${all.length}</b> draws, your exact order matched <b>${r.straight}</b> time(s); any order (box) matched <b>${r.box}</b> time(s).<div style="color:var(--muted);font-size:.8rem;margin-top:6px">Curiosity check only — not an official prize verification.</div></div>`;
+  };
+  wireHistory(g,all);
 }
 
 /* ---------- tabs & events ---------- */
