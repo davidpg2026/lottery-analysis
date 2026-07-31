@@ -90,7 +90,7 @@
 <body>
 <header>
   <h1>🎲 David's Lottery Analysis</h1>
-  <p>A free educational &amp; statistical resource · historical analysis of official Illinois draw results</p>
+  <p>A free educational &amp; statistical resource · historical analysis of official lottery draw results</p>
 </header>
 
 <div class="wrap">
@@ -128,22 +128,23 @@
     <p><b>About this site.</b> David's Lottery Analysis is a free educational and statistical resource. It
     analyzes publicly available historical lottery results to illustrate concepts like frequency, probability,
     distribution, and randomness. It is not a gambling service, does not sell tickets, and is not affiliated
-    with, endorsed by, or sponsored by the Illinois Lottery, Powerball, Mega Millions, or any lottery operator.</p>
+    with, endorsed by, or sponsored by any state lottery, Powerball, Mega Millions, or any lottery operator.</p>
 
     <p><b>No predictions, no edge.</b> Lottery drawings are independent random events. Every combination has the
     same probability every draw. Nothing on this site — including the "hot/cold," "overdue," "consensus," or
     quick-pick features — can predict results or improve anyone's odds of winning. All content is provided for
     curiosity and entertainment only. Results shown here are unofficial; always verify winning numbers and claim
-    prizes through the official Illinois Lottery.</p>
+    prizes through the official lottery for your state.</p>
 
-    <p><b>Play responsibly · 18+.</b> You must be 18 or older to play the lottery in Illinois. If gambling stops
-    being fun or feels like a problem, help is available and confidential: call or text <b>1-800-GAMBLER</b>
-    (1-800-426-2537), or in Illinois call 1-800-252-1775. Please play within your means.</p>
+    <p><b>Play responsibly · 18+.</b> You must be 18 or older (19+ in some states) to play the lottery. If gambling
+    stops being fun or feels like a problem, help is available and confidential: call or text <b>1-800-GAMBLER</b>
+    (1-800-426-2537). Please play within your means.</p>
   </div>
 
-  <div class="sources">Data sources: New York State Open Data (data.ny.gov) for Powerball &amp; Mega Millions —
-  national games with identical numbers nationwide; official illinoislottery.com results for Lotto, Lucky Day
-  Lotto, Pick 3 &amp; Pick 4, refreshed periodically. All analysis runs in your browser; no personal data is collected.</div>
+  <div class="sources">Data sources: New York State Open Data (data.ny.gov) for Powerball &amp; Mega Millions
+  (national games with identical numbers nationwide) and the New York games (NY Lotto, Take 5, Numbers, Win 4);
+  official illinoislottery.com results for the Illinois games (IL Lotto, Lucky Day Lotto, Pick 3 &amp; Pick 4),
+  refreshed periodically. All analysis runs in your browser; no personal data is collected.</div>
 </footer>
 
 <script>
@@ -275,12 +276,34 @@ const GAMES = {
     whiteCount:5,whiteMax:70,specialName:"Mega Ball",specialMax:25,
     liveParse:r=>{const t=(r.winning_numbers||"").trim().split(/\s+/).map(Number);const mb=Number(r.mega_ball);
       if(t.length<5||t.some(isNaN)||isNaN(mb))return null;return{d:r.draw_date.slice(0,10),n:t.slice(0,5),s:mb};}},
-  lotto:{name:"Lotto",type:"ball",src:"il",key:"lotto",
+  lotto:{name:"IL Lotto",type:"ball",src:"il",key:"lotto",
     whiteCount:6,whiteMax:50,specialName:"Extra Shot",specialMax:25},
-  luckydaylotto:{name:"Lucky Day Lotto",type:"ball",src:"il",key:"luckydaylotto",
+  luckydaylotto:{name:"IL Lucky Day Lotto",type:"ball",src:"il",key:"luckydaylotto",
     whiteCount:5,whiteMax:45,specialName:null,specialMax:0},
-  pick3:{name:"Pick 3",type:"digit",src:"il",key:"pick3",digitCount:3,fireball:true},
-  pick4:{name:"Pick 4",type:"digit",src:"il",key:"pick4",digitCount:4,fireball:true}
+  pick3:{name:"IL Pick 3",type:"digit",src:"il",key:"pick3",digitCount:3,fireball:true},
+  pick4:{name:"IL Pick 4",type:"digit",src:"il",key:"pick4",digitCount:4,fireball:true},
+  // ---- New York games (live from data.ny.gov) ----
+  nylotto:{name:"NY Lotto",type:"ball",src:"live",
+    endpoint:"https://data.ny.gov/resource/6nbc-h7bj.json",
+    whiteCount:6,whiteMax:59,specialName:"Bonus",specialMax:59,
+    liveParse:r=>{const t=(r.winning_numbers||"").trim().split(/\s+/).map(Number);const b=Number(r.bonus);
+      if(t.length<6||t.some(isNaN))return null;return{d:r.draw_date.slice(0,10),n:t.slice(0,6),s:isNaN(b)?null:b};}},
+  nytake5:{name:"NY Take 5",type:"ball",src:"live",
+    endpoint:"https://data.ny.gov/resource/dg63-4siq.json",
+    whiteCount:5,whiteMax:39,specialName:null,specialMax:0,
+    liveParse:r=>{const out=[],d=r.draw_date.slice(0,10);
+      const mk=(v,t)=>{if(!v)return;const n=v.trim().split(/\s+/).map(Number);if(n.length>=5&&!n.some(isNaN))out.push({d,t,n:n.slice(0,5),s:null});};
+      mk(r.evening_winning_numbers,'evening');mk(r.midday_winning_numbers,'midday');return out;}},
+  nynumbers:{name:"NY Numbers",type:"digit",src:"live",
+    endpoint:"https://data.ny.gov/resource/hsys-3def.json",digitCount:3,fireball:false,
+    liveParse:r=>{const out=[],d=r.draw_date.slice(0,10);
+      const mk=(v,t)=>{if(v==null||v==='')return;const s=String(v).padStart(3,'0').slice(-3);const g=s.split('').map(Number);if(!g.some(isNaN))out.push({d,t,g,f:null});};
+      mk(r.evening_daily,'evening');mk(r.midday_daily,'midday');return out;}},
+  nywin4:{name:"NY Win 4",type:"digit",src:"live",
+    endpoint:"https://data.ny.gov/resource/hsys-3def.json",digitCount:4,fireball:false,
+    liveParse:r=>{const out=[],d=r.draw_date.slice(0,10);
+      const mk=(v,t)=>{if(v==null||v==='')return;const s=String(v).padStart(4,'0').slice(-4);const g=s.split('').map(Number);if(!g.some(isNaN))out.push({d,t,g,f:null});};
+      mk(r.evening_win_4,'evening');mk(r.midday_win_4,'midday');return out;}}
 };
 
 const state={game:"powerball",cache:{},charts:[],window:"90"};
@@ -294,8 +317,9 @@ async function getDraws(key){
     const url=g.endpoint+"?$limit=50000&$order=draw_date%20DESC";
     const res=await fetch(url);
     if(!res.ok)throw new Error("HTTP "+res.status);
-    draws=(await res.json()).map(g.liveParse).filter(Boolean);
-    draws.sort((a,b)=>a.d<b.d?1:-1);
+    const tord=t=>t==='evening'?2:t==='midday'?1:0;
+    draws=(await res.json()).flatMap(r=>{const p=g.liveParse(r);return p==null?[]:(Array.isArray(p)?p:[p]);}).filter(Boolean);
+    draws.sort((a,b)=> a.d!==b.d ? (a.d<b.d?1:-1) : (tord(b.t)-tord(a.t)));
   }else{
     draws=(IL_DATA[g.key]?.draws||[]).slice(); // already newest-first
   }
@@ -627,7 +651,7 @@ function render(){
 function shortWindowNote(all){
   const req=state.window==="all"?all.length:Number(state.window);
   if(state.window!=="all"&&all.length<req)
-    return `<div class="note">Only <b>${all.length}</b> draws are available so far, fewer than the ${req} requested — this window shows all of them. Illinois-only games grow as the daily updater collects more results.</div>`;
+    return `<div class="note">Only <b>${all.length}</b> draws are available so far, fewer than the ${req} requested — this window shows all of them. The Illinois games grow as more results are collected.</div>`;
   return "";
 }
 
@@ -657,7 +681,7 @@ function renderBall(g,all,draws){
   const matrixNote=A.excluded>0?`<div class="note">Matrix-adjusted: <b>${A.excluded}</b> older-format draw(s) excluded so they don't distort the current ${g.whiteCount}/${A.whiteMax}${A.hasSpecial?` + 1/${A.specialMax}`:''} matrix. Analyzing <b>${A.N}</b> in-matrix draws.</div>`:'';
   document.getElementById("content").innerHTML=shortWindowNote(all)+matrixNote+`<div class="grid">
     <div class="card full" style="border-color:#5c4d1a"><h3>🎯 Quick Pick</h3><div class="sub">Two ways to generate a set: <b>Consensus</b> draws on this window's patterns (hot numbers, common companions, typical sum / odd-even / low-high); <b>Pure random</b> picks with no weighting at all. <b style="color:var(--accent)">For fun only: every combination has identical odds either way, and neither improves your chances of winning.</b></div><div id="pickOut" style="margin-top:6px"></div><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button id="pickBtn" class="tab">🎯 Consensus pick</button><button id="pickRnd" class="tab">🎰 Pure random</button></div></div>
-    <div class="card full"><h3>🎟️ Check your ticket</h3><div class="sub">Enter your ${g.whiteCount} numbers to see how they'd have done against every past ${g.name} draw. <b style="color:var(--accent)">For fun only — to claim a real prize you must verify with the official Illinois Lottery.</b></div>
+    <div class="card full"><h3>🎟️ Check your ticket</h3><div class="sub">Enter your ${g.whiteCount} numbers to see how they'd have done against every past ${g.name} draw. <b style="color:var(--accent)">For fun only — to claim a real prize you must verify with the official lottery for your state.</b></div>
       <div class="tkline"><input id="tkNums" placeholder="${g.whiteCount} numbers 1–${A.whiteMax}, e.g. ${latest.n.map(pad2).join(' ')}" style="flex:1;min-width:200px">${A.hasSpecial?`<input id="tkSpec" placeholder="${g.specialName} 1–${A.specialMax}" style="width:130px">`:''}<button id="tkBtn" class="tab">Check</button></div>
       <div id="tkOut"></div></div>
     <div class="card full"><h3>Number frequency vs random chance</h3><div class="sub">Bars = times drawn (red above average). The dashed line is the count expected from pure chance, and the shaded band is the normal ±2σ range of random variation — bars inside it are indistinguishable from randomness.</div><div class="chartbox tall"><canvas id="c_wfreq"></canvas></div></div>
@@ -814,7 +838,7 @@ function renderDigit(g,all,draws){
   const todCard=daily?`<div class="card full"><h3>🕐 Midday vs evening</h3><div class="sub">Overall digit frequency split by draw time.</div><div class="chartbox"><canvas id="c_tod"></canvas></div></div>`:``;
   document.getElementById("content").innerHTML=shortWindowNote(all)+`<div class="grid">
     <div class="card full" style="border-color:#5c4d1a"><h3>🎯 Quick Pick</h3><div class="sub"><b>Consensus</b> draws each digit from its position's historical frequency; <b>Pure random</b> uses no weighting. <b style="color:var(--accent)">For fun only: draws are random and neither option improves your odds.</b></div><div id="pickOut" style="margin-top:6px"></div><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button id="pickBtn" class="tab">🎯 Consensus pick</button><button id="pickRnd" class="tab">🎰 Pure random</button></div></div>
-    <div class="card full"><h3>🎟️ Check your ticket</h3><div class="sub">Enter your ${g.digitCount} digits to see how they'd have done against every past ${g.name} draw. <b style="color:var(--accent)">For fun only — verify with the official Illinois Lottery to claim a prize.</b></div>
+    <div class="card full"><h3>🎟️ Check your ticket</h3><div class="sub">Enter your ${g.digitCount} digits to see how they'd have done against every past ${g.name} draw. <b style="color:var(--accent)">For fun only — verify with the official lottery for your state to claim a prize.</b></div>
       <div class="tkline"><input id="tkNums" placeholder="${g.digitCount} digits 0–9, e.g. ${latest.g.join(' ')}" style="flex:1;min-width:180px"><button id="tkBtn" class="tab">Check</button></div>
       <div id="tkOut"></div></div>
     <div class="card full"><h3>Digit frequency by position</h3><div class="sub">How often each digit 0–9 landed in each position. In a fair game all bars trend toward equal over time.</div><div class="chartbox tall"><canvas id="c_pos"></canvas></div></div>
@@ -899,7 +923,7 @@ async function switchGame(k){
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.k===k));
   document.getElementById("content").innerHTML=`<div class="loading"><div class="spinner"></div>Loading ${GAMES[k].name}…</div>`;
   try{await getDraws(k);render();}
-  catch(e){document.getElementById("content").innerHTML=`<div class="err">Couldn't load ${GAMES[k].name} (${e.message}). Powerball & Mega Millions need an internet connection to reach the official results feed; Illinois games are built in and work offline.</div>`;}
+  catch(e){document.getElementById("content").innerHTML=`<div class="err">Couldn't load ${GAMES[k].name} (${e.message}). the national and New York games need an internet connection to reach the official data feed; the Illinois games are built in and work offline.</div>`;}
 }
 document.getElementById("window").onchange=e=>{state.window=e.target.value;if(state.cache[state.game])render();};
 
