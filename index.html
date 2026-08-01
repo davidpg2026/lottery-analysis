@@ -275,11 +275,33 @@ const GAMES = {
   powerball:{name:"Powerball",type:"ball",src:"live",
     endpoint:"https://data.ny.gov/resource/d6yy-54nr.json",
     whiteCount:5,whiteMax:69,specialName:"Powerball",specialMax:26,
+    ticketPrice:2,defaultJackpot:100000000,
+    prizes:[
+      {w:5,s:true,prize:'jackpot',odds:292201338},
+      {w:5,s:false,prize:1000000,odds:11688053.52},
+      {w:4,s:true,prize:50000,odds:913129.18},
+      {w:4,s:false,prize:100,odds:36525.17},
+      {w:3,s:true,prize:100,odds:14494.11},
+      {w:3,s:false,prize:7,odds:579.76},
+      {w:2,s:true,prize:7,odds:701.33},
+      {w:1,s:true,prize:4,odds:91.98},
+      {w:0,s:true,prize:4,odds:38.32}],
     liveParse:r=>{const t=(r.winning_numbers||"").trim().split(/\s+/).map(Number);
       if(t.length<6||t.some(isNaN))return null;return{d:r.draw_date.slice(0,10),n:t.slice(0,5),s:t[5]};}},
   megamillions:{name:"Mega Millions",type:"ball",src:"live",
     endpoint:"https://data.ny.gov/resource/5xaw-6ayf.json",
     whiteCount:5,whiteMax:70,specialName:"Mega Ball",specialMax:25,
+    ticketPrice:5,defaultJackpot:200000000,avgMult:3,
+    prizes:[
+      {w:5,s:true,prize:'jackpot',odds:290472336},
+      {w:5,s:false,prize:1000000,odds:12629232,mult:true},
+      {w:4,s:true,prize:10000,odds:893761,mult:true},
+      {w:4,s:false,prize:500,odds:38858.51,mult:true},
+      {w:3,s:true,prize:200,odds:13965.98,mult:true},
+      {w:3,s:false,prize:10,odds:607.22,mult:true},
+      {w:2,s:true,prize:10,odds:665,mult:true},
+      {w:1,s:true,prize:7,odds:85.81,mult:true},
+      {w:0,s:true,prize:5,odds:35.17,mult:true}],
     liveParse:r=>{const t=(r.winning_numbers||"").trim().split(/\s+/).map(Number);const mb=Number(r.mega_ball);
       if(t.length<5||t.some(isNaN)||isNaN(mb))return null;return{d:r.draw_date.slice(0,10),n:t.slice(0,5),s:mb};}},
   lotto:{name:"IL Lotto",type:"ball",src:"il",key:"lotto",
@@ -553,6 +575,156 @@ function randomDigitPick(g){
 }
 
 /* ============================================================
+   ADVANCED ANALYTICS: expected value, popularity, simulation,
+   and a randomness test battery (all descriptive / educational)
+   ============================================================ */
+function fmt(n){if(!isFinite(n))return '—';const a=Math.abs(n);
+  if(a>=1e9)return (n/1e9).toFixed(2)+'B';if(a>=1e6)return (n/1e6).toFixed(2)+'M';
+  if(a>=1e3)return Math.round(n).toLocaleString();
+  return (Math.round(n*100)/100).toLocaleString();}
+function money(n){return (n<0?'-$':'$')+fmt(Math.abs(n));}
+
+/* ---- Expected value & break-even jackpot (games with a prize table) ---- */
+function tierLabel(g,pr){return pr.prize==='jackpot'?(pr.w+' + '+g.specialName):(pr.w+(pr.s?' + '+g.specialName:''));}
+function prizeForMatch(g,wm,sm){for(const pr of g.prizes){if(pr.w===wm&&(!!pr.s)===(!!sm))return pr;}return null;}
+function tierValue(g,pr,jackpotNet,avgMult){
+  if(pr.prize==='jackpot')return jackpotNet;
+  return pr.prize*(pr.mult?avgMult:1);
+}
+function computeEV(g,jackpotGross,taxRate,split,avgMult){
+  const t=1-taxRate;let jackOdds=1,nonJack=0;const tiers=[];
+  g.prizes.forEach(pr=>{
+    const per=1/pr.odds;
+    if(pr.prize==='jackpot'){jackOdds=pr.odds;const net=jackpotGross*t/Math.max(1,split);
+      tiers.push({label:tierLabel(g,pr),odds:pr.odds,prize:net,contrib:net*per});}
+    else{const val=pr.prize*(pr.mult?avgMult:1)*t;nonJack+=val*per;
+      tiers.push({label:tierLabel(g,pr),odds:pr.odds,prize:val,contrib:val*per});}
+  });
+  const jackPerDollar=t/Math.max(1,split)/jackOdds;
+  const jackContrib=jackpotGross*jackPerDollar;
+  const ev=jackContrib+nonJack-g.ticketPrice;
+  const breakEven=(g.ticketPrice-nonJack)/jackPerDollar;
+  return {ev,evPct:ev/g.ticketPrice*100,breakEven,nonJack,jackContrib,tiers};
+}
+
+/* ---- Combination popularity (jackpot-sharing risk; odds are unaffected) ---- */
+function combinationPopularity(nums,g){
+  const wc=g.whiteCount,wm=g.whiteMax,s=[...nums].sort((a,b)=>a-b);
+  const factors=[];let crowd=0;
+  const cal=s.filter(n=>n<=31).length;
+  if(cal===wc){crowd+=3;factors.push('Every number is ≤ 31 — the classic birthday/calendar pattern a huge share of players use.');}
+  else if(cal>=wc-1){crowd+=2;factors.push(cal+' of '+wc+' numbers fall in the 1–31 birthday range.');}
+  let consec=0;for(let i=1;i<s.length;i++)if(s[i]-s[i-1]===1)consec++;
+  if(consec>=wc-1){crowd+=3;factors.push('A full running sequence (e.g. 1-2-3-4-5) — very heavily played.');}
+  else if(consec>=2){crowd+=1;factors.push('Contains a run of consecutive numbers.');}
+  const diffs=[];for(let i=1;i<s.length;i++)diffs.push(s[i]-s[i-1]);
+  if(diffs.length&&diffs.every(d=>d===diffs[0])&&diffs[0]>1){crowd+=2;factors.push('Evenly spaced "system" pattern (e.g. 5-10-15-20-25).');}
+  const sum=s.reduce((a,b)=>a+b,0),mid=wc*(1+wm)/2;
+  if(sum<mid*0.72){crowd+=1;factors.push('Low total — players pick small numbers far more often than large ones.');}
+  const lucky=new Set([3,7,11,13,21]);const lc=s.filter(n=>lucky.has(n)).length;
+  if(lc>=Math.ceil(wc/2)){crowd+=1;factors.push('Several traditional "lucky" numbers (7, 3, 11…).');}
+  const score=Math.min(10,crowd);
+  let verdict;
+  if(score>=6)verdict='Very popular pattern — if it ever hit, you would likely split the jackpot with many other winners.';
+  else if(score>=3)verdict='Moderately popular — some jackpot-sharing risk.';
+  else verdict='Uncommon pattern — if it hit, fewer people would share the prize, so you would keep more.';
+  if(!factors.length)factors.push('No common popularity patterns detected — spread nicely across the field.');
+  return {score,factors,verdict,sum};
+}
+
+/* ---- Monte Carlo & strategy backtest ---- */
+function randTicket(max,count){const pool=[];for(let n=1;n<=max;n++)pool.push(n);
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+  return pool.slice(0,count).sort((a,b)=>a-b);}
+function simulateBall(g,n,jackpotGross,avgMult){
+  const wc=g.whiteCount,wm=g.whiteMax,sm=g.specialMax,hasS=g.specialName!=null;
+  const ticket=randTicket(wm,wc),tspec=hasS?1+Math.floor(Math.random()*sm):null;
+  const price=g.ticketPrice||2;let spent=0,won=0,anyWin=0;const hits={};
+  for(let i=0;i<n;i++){
+    const draw=randTicket(wm,wc),dspec=hasS?1+Math.floor(Math.random()*sm):null;
+    const wmatch=ticket.filter(x=>draw.includes(x)).length,smatch=hasS?(tspec===dspec):false;
+    spent+=price;
+    if(g.prizes){const pr=prizeForMatch(g,wmatch,smatch);
+      if(pr){const key=tierLabel(g,pr);hits[key]=(hits[key]||0)+1;anyWin++;
+        won+=pr.prize==='jackpot'?jackpotGross:(pr.prize*(pr.mult?avgMult:1));}}
+    else{const key=wmatch+(smatch?' + '+g.specialName:'');if(wmatch>=(wc-2)||smatch){hits[key]=(hits[key]||0)+1;if(wmatch>=wc||smatch)anyWin++;}}
+  }
+  return {ticket,tspec,spent,won,anyWin,hits,n,hasPrizes:!!g.prizes};
+}
+function strategyTickets(A,g){
+  const wc=g.whiteCount;
+  const hot=[...A.whites].sort((a,b)=>b.count-a.count).slice(0,wc).map(w=>w.n).sort((a,b)=>a-b);
+  const cold=[...A.whites].sort((a,b)=>a.count-b.count).slice(0,wc).map(w=>w.n).sort((a,b)=>a-b);
+  const overdue=[...A.whites].sort((a,b)=>b.gap-a.gap).slice(0,wc).map(w=>w.n).sort((a,b)=>a-b);
+  const rand=randTicket(A.whiteMax,wc);
+  return {Hot:hot,Cold:cold,Overdue:overdue,Random:rand};
+}
+function backtestBall(all,g,ticket){
+  const wc=g.whiteCount;let points=0,three=0,four=0,five=0;
+  all.forEach(d=>{const m=ticket.filter(n=>d.n.includes(n)).length;points+=m;
+    if(m>=3)three++;if(m>=4)four++;if(m>=5)five++;});
+  return {points,three,four,five,draws:all.length};
+}
+
+/* ---- Randomness test battery ---- */
+function median(a){const s=[...a].sort((x,y)=>x-y);const m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;}
+function runsTest(vals){
+  const med=median(vals);const seq=[];vals.forEach(v=>{if(v!==med)seq.push(v>med?1:0);});
+  let n1=0,n2=0;seq.forEach(b=>b?n1++:n2++);
+  let runs=seq.length?1:0;for(let i=1;i<seq.length;i++)if(seq[i]!==seq[i-1])runs++;
+  if(n1<1||n2<1)return {runs,z:0,p:1};
+  const N=n1+n2,mu=1+2*n1*n2/N,varr=2*n1*n2*(2*n1*n2-N)/(N*N*(N-1));
+  const z=varr>0?(runs-mu)/Math.sqrt(varr):0,p=2*(1-normalCdf(Math.abs(z)));
+  return {runs,expected:mu,z,p:Math.max(0,Math.min(1,p))};
+}
+function autocorr1(a){const n=a.length;if(n<3)return 0;const m=a.reduce((x,y)=>x+y,0)/n;
+  let num=0,den=0;for(let i=0;i<n;i++){den+=(a[i]-m)**2;if(i<n-1)num+=(a[i]-m)*(a[i+1]-m);}
+  return den?num/den:0;}
+function ksNormal(sample,mean,sd){const n=sample.length;if(n<5||sd<=0)return {D:0,p:1};
+  const s=[...sample].sort((a,b)=>a-b);let D=0;
+  for(let i=0;i<n;i++){const cdf=normalCdf((s[i]-mean)/sd);
+    D=Math.max(D,Math.abs(cdf-i/n),Math.abs((i+1)/n-cdf));}
+  const t=(Math.sqrt(n)+0.12+0.11/Math.sqrt(n))*D;let p=0;
+  for(let k=1;k<=100;k++)p+=(k%2?1:-1)*Math.exp(-2*k*k*t*t);p=2*p;
+  return {D,p:Math.max(0,Math.min(1,p))};}
+function entropyPct(freq){const arr=freq.filter(x=>x!=null);const tot=arr.reduce((a,b)=>a+b,0);
+  if(!tot||arr.length<2)return 0;let H=0;arr.forEach(f=>{if(f>0){const p=f/tot;H-=p*Math.log2(p);}});
+  return Math.max(0,Math.min(100,H/Math.log2(arr.length)*100));}
+function fairnessGrade(passes){const pass=passes.filter(Boolean).length,tot=passes.length,r=tot?pass/tot:1;
+  if(r>=1)return {g:'A',t:'Textbook random — every test passed'};
+  if(r>=0.75)return {g:'A−',t:'Consistent with true randomness'};
+  if(r>=0.5)return {g:'B',t:'Mostly random; minor quirks well within chance'};
+  if(r>=0.25)return {g:'C',t:'Some deviations — normal for small samples, worth re-checking as draws accrue'};
+  return {g:'D',t:'Several deviations from the random ideal'};}
+function runFairness(sums,freqArr,chiP){
+  const rt=runsTest(sums),ac=autocorr1(sums),acAbs=Math.abs(ac);
+  const ks=ksNormal(sums,sums.reduce((a,b)=>a+b,0)/(sums.length||1),
+    Math.sqrt(sums.reduce((a,b,_,arr)=>a+(b-arr.reduce((x,y)=>x+y,0)/arr.length)**2,0)/(sums.length||1)));
+  const ent=entropyPct(freqArr);
+  const tests=[
+    {name:'Chi-square uniformity',val:'p = '+(chiP*100).toFixed(0)+'%',pass:chiP>=0.05,
+      note:'Are all numbers drawn about equally often?'},
+    {name:'Runs test (streakiness)',val:'p = '+(rt.p*100).toFixed(0)+'%',pass:rt.p>=0.05,
+      note:'Do highs and lows alternate like true chance, with no clustering?'},
+    {name:'Lag-1 autocorrelation',val:ac.toFixed(3),pass:acAbs<0.2,
+      note:'Does one draw’s total predict the next? Should be ≈ 0.'},
+    {name:'Kolmogorov–Smirnov (bell curve)',val:'p = '+(ks.p*100).toFixed(0)+'%',pass:ks.p>=0.05,
+      note:'Do the draw totals follow the normal curve chance predicts?'},
+    {name:'Entropy (spread of outcomes)',val:ent.toFixed(1)+'%',pass:ent>=95,
+      note:'How close to maximum unpredictability, where 100% is perfect?'}
+  ];
+  return {tests,grade:fairnessGrade(tests.map(t=>t.pass))};
+}
+function fairnessHTML(F){
+  return `<div style="display:flex;align-items:center;gap:14px;margin:4px 0 12px">
+    <div style="font-size:2.4rem;font-weight:800;color:var(--accent);line-height:1">${F.grade.g}</div>
+    <div style="color:var(--text)">${F.grade.t}</div></div>
+    <table><thead><tr><th>Test</th><th>Result</th><th></th></tr></thead><tbody>`+
+    F.tests.map(t=>`<tr><td>${t.name}<div style="color:var(--muted);font-size:.72rem;font-weight:400;text-transform:none;letter-spacing:0">${t.note}</div></td><td>${t.val}</td><td style="font-weight:700;color:${t.pass?'var(--good)':'var(--accent)'}">${t.pass?'PASS':'FLAG'}</td></tr>`).join('')+
+    `</tbody></table><div style="color:var(--muted);font-size:.78rem;margin-top:6px">A "FLAG" doesn't mean the game is rigged — with a limited number of draws, chance alone trips one test now and then. Grades firm up as more results accumulate.</div>`;
+}
+
+/* ============================================================
    RENDER HELPERS
    ============================================================ */
 function destroyCharts(){state.charts.forEach(c=>c.destroy());state.charts=[];}
@@ -685,7 +857,36 @@ function renderBall(g,all,draws){
   const numOpts=A.whites.map(w=>`<option value="${w.n}">${w.n}</option>`).join("");
 
   const matrixNote=A.excluded>0?`<div class="note">Matrix-adjusted: <b>${A.excluded}</b> older-format draw(s) excluded so they don't distort the current ${g.whiteCount}/${A.whiteMax}${A.hasSpecial?` + 1/${A.specialMax}`:''} matrix. Analyzing <b>${A.N}</b> in-matrix draws.</div>`:'';
+
+  const evCard=g.prizes?`
+    <div class="card full" style="border-color:#1e4620"><h3>💰 Expected value &amp; break-even</h3><div class="sub">The real math behind a $${g.ticketPrice} ticket. Enter the current advertised jackpot and your own assumptions — it recomputes live. <b style="color:var(--accent)">Even at record jackpots the expected value is almost always negative; this shows exactly how negative.</b></div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin:6px 0 4px">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Jackpot ($)<input id="evJack" type="number" value="${g.defaultJackpot}" min="0" step="1000000" style="width:150px"></label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Tax rate (%)<input id="evTax" type="number" value="37" min="0" max="60" step="1" style="width:90px"></label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Split (winners)<input id="evSplit" type="number" value="1" min="1" step="1" style="width:100px"></label>
+        ${g.avgMult?`<label style="display:flex;flex-direction:column;gap:4px;font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Avg multiplier<input id="evMult" type="number" value="${g.avgMult}" min="1" max="10" step="0.5" style="width:90px"></label>`:''}
+      </div><div id="evOut"></div></div>`:'';
+
+  const popCard=`
+    <div class="card full"><h3>👥 Combination popularity</h3><div class="sub">Choosing rare patterns does <b>not</b> improve your odds — but if you win, an unpopular set means fewer people to split with. Enter ${g.whiteCount} numbers to score how crowded your pick is.</div>
+      <div class="tkline"><input id="popNums" placeholder="${g.whiteCount} numbers 1–${A.whiteMax}, e.g. ${latest.n.map(pad2).join(' ')}" style="flex:1;min-width:200px"><button id="popBtn" class="tab">Score it</button></div>
+      <div id="popOut"></div></div>`;
+
+  const simCard=`
+    <div class="card full"><h3>🎰 Play it thousands of times</h3><div class="sub">Buy one random ticket and let the computer run a mountain of draws in a blink — see what really happens when you play a lot.${g.prizes?' Winnings use the real prize table.':''}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0"><label style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:flex;align-items:center;gap:6px">Draws <select id="simN"><option>1000</option><option selected>10000</option><option>100000</option><option>1000000</option></select></label><button id="simBtn" class="tab">▶ Run simulation</button></div>
+      <div id="simOut"></div></div>`;
+
+  const backCard=`
+    <div class="card full"><h3>🧪 Strategy backtest</h3><div class="sub">Does betting "hot" or "overdue" numbers beat random? We replay each strategy's numbers against all ${all.length} past ${g.name} draws. If the theories worked, one row would pull ahead.</div>
+      <button id="backBtn" class="tab">▶ Run backtest</button><div id="backOut" style="margin-top:10px"></div></div>`;
+
+  const fairCard=`
+    <div class="card full"><h3>🏅 Fairness report card</h3><div class="sub">Five independent statistical tests grade whether these results are indistinguishable from true randomness. A fair lottery should score well — and any "pattern" you spot is the kind chance produces on its own.</div>
+      <div id="fairOut"></div></div>`;
+
   document.getElementById("content").innerHTML=shortWindowNote(all)+matrixNote+`<div class="grid">
+    ${evCard}${popCard}${fairCard}${simCard}${backCard}
     <div class="card full" style="border-color:#5c4d1a"><h3>🎯 Quick Pick</h3><div class="sub">Two ways to generate a set: <b>Consensus</b> draws on this window's patterns (hot numbers, common companions, typical sum / odd-even / low-high); <b>Pure random</b> picks with no weighting at all. <b style="color:var(--accent)">For fun only: every combination has identical odds either way, and neither improves your chances of winning.</b></div><div id="pickOut" style="margin-top:6px"></div><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button id="pickBtn" class="tab">🎯 Consensus pick</button><button id="pickRnd" class="tab">🎰 Pure random</button></div></div>
     <div class="card full"><h3>🎟️ Check your ticket</h3><div class="sub">Enter your ${g.whiteCount} numbers to see how they'd have done against every past ${g.name} draw. <b style="color:var(--accent)">For fun only — to claim a real prize you must verify with the official lottery for your state.</b></div>
       <div class="tkline"><input id="tkNums" placeholder="${g.whiteCount} numbers 1–${A.whiteMax}, e.g. ${latest.n.map(pad2).join(' ')}" style="flex:1;min-width:200px">${A.hasSpecial?`<input id="tkSpec" placeholder="${g.specialName} 1–${A.specialMax}" style="width:130px">`:''}<button id="tkBtn" class="tab">Check</button></div>
@@ -828,6 +1029,64 @@ function renderBall(g,all,draws){
   mk("c_lh",{type:"doughnut",data:{labels:lh.map((_,i)=>i+" low"),datasets:[{data:lh,backgroundColor:palette(K+1).reverse()}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:TICK,font:{size:10}}}}}});
   const years=Object.keys(A.byYear).sort();
   mk("c_year",{type:"line",data:{labels:years,datasets:[{data:years.map(y=>A.byYear[y]),borderColor:"#4aa3ff",backgroundColor:"rgba(74,163,255,.15)",fill:true,tension:.25}]},options:baseOpts({plugins:{legend:{display:false}}})});
+
+  // ---- expected value (live) ----
+  if(g.prizes){
+    const evJack=document.getElementById('evJack'),evTax=document.getElementById('evTax'),evSplit=document.getElementById('evSplit'),evMult=document.getElementById('evMult'),evOut=document.getElementById('evOut');
+    const drawEV=()=>{
+      const jp=Math.max(0,+evJack.value||0),tax=Math.min(0.6,Math.max(0,(+evTax.value||0)/100)),split=Math.max(1,+evSplit.value||1),mult=g.avgMult?Math.max(1,(evMult&&+evMult.value)||g.avgMult):1;
+      const r=computeEV(g,jp,tax,split,mult);
+      const rows=r.tiers.map(t=>`<tr><td class="num">${t.label}</td><td>1 in ${fmt(t.odds)}</td><td>${money(t.prize)}</td><td>${money(t.contrib)}</td></tr>`).join('');
+      const col=r.ev>=0?'var(--good)':'#ff5c5c';
+      evOut.innerHTML=`<div class="stat-row"><div class="stat"><div class="v" style="color:${col}">${money(r.ev)}</div><div class="l">Value per $${g.ticketPrice} ticket</div></div><div class="stat"><div class="v" style="color:${col}">${r.evPct.toFixed(0)}%</div><div class="l">Return on price</div></div><div class="stat"><div class="v">${money(r.breakEven)}</div><div class="l">Break-even jackpot</div></div></div>
+        <table style="margin-top:10px"><thead><tr><th>Match</th><th>Odds</th><th>Value</th><th>Value ÷ odds</th></tr></thead><tbody>${rows}</tbody></table>
+        <div style="color:var(--muted);font-size:.78rem;margin-top:6px">Value per ticket = Σ(prize ÷ odds) − price. Jackpot is shown after tax and splitting;${g.avgMult?' non-jackpot prizes use your average multiplier;':''} taxes applied to every tier. Assumes the advertised annuity jackpot — a lump sum is smaller, making the real EV worse.</div>`;
+    };
+    [evJack,evTax,evSplit,evMult].forEach(el=>{if(el)el.oninput=drawEV;});
+    drawEV();
+  }
+  // ---- combination popularity ----
+  const popBtn=document.getElementById('popBtn');
+  if(popBtn)popBtn.onclick=()=>{
+    const out=document.getElementById('popOut');
+    const raw=[...new Set((document.getElementById('popNums').value.match(/\d+/g)||[]).map(Number))];
+    if(raw.length!==g.whiteCount||raw.some(n=>n<1||n>A.whiteMax)){out.innerHTML=`<div class="tkres">Enter exactly ${g.whiteCount} different numbers between 1 and ${A.whiteMax}.</div>`;return;}
+    const r=combinationPopularity(raw,g),bar=r.score*10,col=r.score>=6?'#ff5c5c':r.score>=3?'var(--accent)':'var(--good)';
+    out.innerHTML=`<div class="tkres"><div style="font-weight:600;margin-bottom:6px">Crowd score: ${r.score} / 10</div>
+      <div style="height:10px;border-radius:6px;background:#20272f;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:${bar}%;background:${col}"></div></div>
+      <div style="margin-bottom:6px">${r.verdict}</div>
+      <ul style="margin:0 0 4px 18px;padding:0">${r.factors.map(f=>`<li style="margin:2px 0">${f}</li>`).join('')}</ul>
+      <div style="color:var(--accent);font-size:.8rem;margin-top:6px">Every combination has identical odds of being drawn — this only changes how many people you'd share a jackpot with.</div></div>`;
+  };
+  // ---- fairness report card ----
+  const fairOut=document.getElementById('fairOut');
+  if(fairOut)fairOut.innerHTML=fairnessHTML(runFairness(A.sums,A.whites.map(w=>w.count),A.wP));
+  // ---- Monte Carlo ----
+  const simBtn=document.getElementById('simBtn');
+  if(simBtn)simBtn.onclick=()=>{
+    const out=document.getElementById('simOut'),n=+document.getElementById('simN').value;
+    const jEl=document.getElementById('evJack'),mEl=document.getElementById('evMult');
+    const jp=(jEl&&+jEl.value)||g.defaultJackpot||0,mult=g.avgMult?((mEl&&+mEl.value)||g.avgMult):1;
+    out.innerHTML=`<div style="color:var(--muted)">Running ${n.toLocaleString()} draws…</div>`;
+    setTimeout(()=>{
+      const r=simulateBall(g,n,jp,mult),net=r.won-r.spent;
+      const tierRows=Object.entries(r.hits).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<tr><td class="num">${k}</td><td>${v.toLocaleString()}</td></tr>`).join('')||`<tr><td colspan="2" style="color:var(--muted)">Not a single prize in ${n.toLocaleString()} plays.</td></tr>`;
+      const stats=r.hasPrizes?`<div class="stat"><div class="v">${money(r.spent)}</div><div class="l">Spent</div></div><div class="stat"><div class="v">${money(r.won)}</div><div class="l">Won</div></div><div class="stat"><div class="v" style="color:${net>=0?'var(--good)':'#ff5c5c'}">${money(net)}</div><div class="l">Net result</div></div>`:`<div class="stat"><div class="v">${r.anyWin.toLocaleString()}</div><div class="l">Top-tier hits</div></div>`;
+      out.innerHTML=`<div style="font-size:.82rem;color:var(--muted);margin-bottom:6px">Your random ticket: <b style="color:var(--text)">${r.ticket.map(pad2).join(' ')}${r.tspec!=null?' + '+pad2(r.tspec):''}</b></div>
+        <div class="stat-row">${stats}</div>
+        <table style="margin-top:10px"><thead><tr><th>Prize tier hit</th><th>Times</th></tr></thead><tbody>${tierRows}</tbody></table>
+        ${r.hasPrizes&&net<0?`<div style="color:var(--accent);font-size:.8rem;margin-top:6px">Over enough plays the house edge always wins — that's the whole point.</div>`:''}`;
+    },30);
+  };
+  // ---- strategy backtest ----
+  const backBtn=document.getElementById('backBtn');
+  if(backBtn)backBtn.onclick=()=>{
+    const out=document.getElementById('backOut'),strat=strategyTickets(A,g);
+    const rows=Object.entries(strat).map(([name,tk])=>{const r=backtestBall(all,g,tk);
+      return `<tr><td>${name}</td><td class="num" style="font-size:.78rem">${tk.map(pad2).join(' ')}</td><td>${r.points}</td><td>${(r.points/r.draws).toFixed(2)}</td><td>${r.three}</td><td>${r.four}</td></tr>`;}).join('');
+    out.innerHTML=`<table><thead><tr><th>Strategy</th><th>Numbers</th><th>Total matches</th><th>Avg / draw</th><th>3+ hits</th><th>4+ hits</th></tr></thead><tbody>${rows}</tbody></table>
+      <div style="color:var(--accent);font-size:.8rem;margin-top:6px">Every strategy lands within a whisker of the others and of pure random — past frequency carries no predictive edge, exactly as probability theory predicts.</div>`;
+  };
 }
 
 /* ---------- DIGIT render ---------- */
@@ -847,6 +1106,7 @@ function renderDigit(g,all,draws){
     <div class="card full"><h3>🎟️ Check your ticket</h3><div class="sub">Enter your ${g.digitCount} digits to see how they'd have done against every past ${g.name} draw. <b style="color:var(--accent)">For fun only — verify with the official lottery for your state to claim a prize.</b></div>
       <div class="tkline"><input id="tkNums" placeholder="${g.digitCount} digits 0–9, e.g. ${latest.g.join(' ')}" style="flex:1;min-width:180px"><button id="tkBtn" class="tab">Check</button></div>
       <div id="tkOut"></div></div>
+    <div class="card full"><h3>🏅 Fairness report card</h3><div class="sub">Five independent statistical tests grade whether these digit results are indistinguishable from true randomness.</div><div id="fairOut"></div></div>
     <div class="card full"><h3>Digit frequency by position</h3><div class="sub">How often each digit 0–9 landed in each position. In a fair game all bars trend toward equal over time.</div><div class="chartbox tall"><canvas id="c_pos"></canvas></div></div>
     <div class="card"><h3>Overall digit frequency vs chance</h3><div class="sub">All positions combined. Dashed line = expected from chance; shaded band = ±2σ random range.</div><div class="chartbox"><canvas id="c_all"></canvas></div></div>
     <div class="card"><h3>🎲 Randomness test (χ²)</h3><div class="sub">Chi-square goodness-of-fit of the digit frequencies against a perfectly uniform draw.</div>
@@ -905,6 +1165,9 @@ function renderDigit(g,all,draws){
   if(pickBtn)pickBtn.onclick=()=>showDig(consensusDigitPick(A,g),'Consensus pick');
   if(pickRnd)pickRnd.onclick=()=>showDig(randomDigitPick(g),'Pure random');
   showDig(consensusDigitPick(A,g),'Consensus pick');
+  // fairness report card
+  const fairOut=document.getElementById('fairOut');
+  if(fairOut)fairOut.innerHTML=fairnessHTML(runFairness(A.sums,A.allFreq,A.dP));
   // ticket checker
   const tkBtn=document.getElementById('tkBtn');
   if(tkBtn)tkBtn.onclick=()=>{
