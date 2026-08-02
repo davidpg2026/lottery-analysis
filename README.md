@@ -1,66 +1,60 @@
 # David's Lottery Analysis
 
-A self-updating statistics site for Illinois lottery games (Powerball, Mega Millions,
-Lotto, Lucky Day Lotto, Pick 3, Pick 4). All analysis runs in the browser.
+A self-contained statistics site for a range of lottery games. Every chart and
+number runs in your browser — there is no server, no build step, and no personal
+data is collected. It's descriptive statistics for entertainment only: lottery
+draws are independent random events, so nothing here can predict results or
+improve anyone's odds.
 
-- **Powerball & Mega Millions** load live from the official national results feed (full history).
-- **Illinois-only games** are stored in the page and refreshed daily by a GitHub Action.
+**Live site:** https://davidpg2026.github.io/lottery-analysis/
 
-Everything here is descriptive statistics for entertainment. Lottery draws are independent
-random events — nothing on the site can predict results or improve anyone's odds.
+## Games covered
 
----
+**Live from New York State Open Data (data.ny.gov)** — these refresh automatically
+in your browser every time the page loads, straight from the official open-data
+feed, at no cost:
 
-## Publish it (one-time setup)
+- **Powerball**, **Mega Millions**, **Millionaire For Life** — multi-state games
+  drawn with identical numbers nationwide (full history).
+- **NY Lotto**, **Take 5**, **Numbers**, **Win 4** — New York draw games.
+- **Pick 10** and **Quick Draw** — keno-style games that draw 20 numbers from 1–80.
+  For these, frequency, gap, sum and uniformity stats are shown, but pair/triplet
+  co-occurrence tables are omitted because with 20 numbers per draw those counts
+  aren't meaningful.
 
-You'll do this once; after that it updates itself every day with no further action.
+**Illinois games** — **IL Lotto**, **IL Lucky Day Lotto**, **IL Pick 3**, **IL Pick 4**.
+Illinois has no free public open-data feed, so these results are stored inside the
+page as a snapshot.
 
-### 1. Create the repository
-1. Sign in to GitHub, then go to **https://github.com/new**.
-2. **Repository name:** `lottery-analysis`
-3. Set it to **Public** (required for free GitHub Pages hosting).
-4. Leave everything else as-is and click **Create repository**.
+## How it stays up to date
 
-### 2. Upload these files
-On the new repo page, click **uploading an existing file** (or **Add file → Upload files**),
-then drag in all of these, keeping the folder structure:
+The multi-state and New York games need no maintenance — the page reads the live
+data.ny.gov feed each time it opens. There is nothing to run and your computer can
+be off.
 
-```
-index.html
-update.js
-README.md
-.github/workflows/update.yml
-```
+A GitHub Action (`.github/workflows/update.yml`) is included to refresh the built-in
+Illinois snapshots on a schedule. It runs `update.py`; if that script isn't present
+in the repository the workflow simply has nothing to do and the live games are
+unaffected.
 
-Tip: the easiest way to keep the `.github/workflows/` folder is to drag the whole
-project folder in at once. Then click **Commit changes**.
+## Add another game later
 
-### 3. Turn on GitHub Pages (the public website)
-1. In the repo, go to **Settings → Pages**.
-2. Under **Build and deployment → Source**, choose **Deploy from a branch**.
-3. Branch: **main**, folder: **/ (root)**. Click **Save**.
-4. Wait ~1 minute. Your site will be live at:
-
-   **https://davidpg2026.github.io/lottery-analysis/**
-
-   Open that link from any device — phone, tablet, any computer.
-
-### 4. Allow the daily updater to save results
-1. Go to **Settings → Actions → General**.
-2. Scroll to **Workflow permissions**, choose **Read and write permissions**, and **Save**.
-
-### 5. Run it once to confirm
-1. Go to the **Actions** tab.
-2. Click **Update lottery data** on the left, then **Run workflow → Run workflow**.
-3. After a minute it should show a green check and (if there were new draws) commit them.
-   Refresh your site to see the latest numbers.
-
-That's it. From now on it runs automatically each morning — your computer can be off.
-
----
-
-## Add another lottery later
 Open `index.html`, find the `GAMES` config block near the top, and add an entry
-following the existing pattern (name, type, number range, bonus ball, data source).
-Ball games and digit (Pick-style) games are both supported. For an Illinois game that
-should auto-update, also add it to the `GAMES` list in `update.js`.
+following the existing pattern:
+
+- **Ball games** need `whiteCount`, `whiteMax`, and (if there's a bonus ball)
+  `specialName` / `specialMax`. Set `src:"live"` with an `endpoint` and a
+  `liveParse` function for an open-data feed, or `src:"il"` for a built-in snapshot.
+- **Digit / Pick-style games** use `type:"digit"` with `digitCount`.
+- **Large-field keno-style games** (more than 10 numbers per draw) should set
+  `largeField:true` so the expensive co-occurrence analysis is skipped. An optional
+  `limit` caps how many recent draws are fetched (useful for very high-volume feeds
+  like Quick Draw).
+
+Any game added to `GAMES` automatically gets its own tab.
+
+## Republishing
+
+The site is a single `index.html` plus images. To host it, put the repository on
+GitHub Pages (Settings → Pages → Deploy from a branch → `main` / root). Once Pages
+is on, the live site updates itself with each visit.

@@ -141,8 +141,9 @@
     (1-800-426-2537). Please play within your means.</p>
   </div>
 
-  <div class="sources">Data sources: New York State Open Data (data.ny.gov) for Powerball &amp; Mega Millions
-  (national games with identical numbers nationwide) and the New York games (NY Lotto, Take 5, Numbers, Win 4);
+  <div class="sources">Data sources: New York State Open Data (data.ny.gov) for Powerball, Mega Millions &amp;
+  Millionaire For Life (multi-state games with identical numbers nationwide) and the New York games
+  (NY Lotto, Take 5, Numbers, Win 4, Pick 10, Quick Draw);
   official illinoislottery.com results for the Illinois games (IL Lotto, Lucky Day Lotto, Pick 3 &amp; Pick 4),
   refreshed periodically. All analysis runs in your browser; no personal data is collected.</div>
 </footer>
@@ -331,7 +332,24 @@ const GAMES = {
     endpoint:"https://data.ny.gov/resource/hsys-3def.json",digitCount:4,fireball:false,
     liveParse:r=>{const out=[],d=r.draw_date.slice(0,10);
       const mk=(v,t)=>{if(v==null||v==='')return;const s=String(v).padStart(4,'0').slice(-4);const g=s.split('').map(Number);if(!g.some(isNaN))out.push({d,t,g,f:null});};
-      mk(r.evening_win_4,'evening');mk(r.midday_win_4,'midday');return out;}}
+      mk(r.evening_win_4,'evening');mk(r.midday_win_4,'midday');return out;}},
+  // ---- Millionaire For Life (multi-state; NY feed; replaces the retired Cash4Life) ----
+  mflife:{name:"Millionaire For Life",type:"ball",src:"live",
+    endpoint:"https://data.ny.gov/resource/a4w9-a3tp.json",
+    whiteCount:5,whiteMax:58,specialName:"Millionaire Ball",specialMax:5,
+    liveParse:r=>{const t=(r.winning_numbers||"").trim().split(/\s+/).map(Number);const mb=Number(r.mill_ball);
+      if(t.length<5||t.some(isNaN))return null;return{d:r.draw_date.slice(0,10),n:t.slice(0,5),s:isNaN(mb)?null:mb};}},
+  // ---- Keno-style large-field games (20 numbers drawn from 1–80) ----
+  nypick10:{name:"NY Pick 10",type:"ball",src:"live",largeField:true,
+    endpoint:"https://data.ny.gov/resource/bycu-cw7c.json",
+    whiteCount:20,whiteMax:80,specialName:null,specialMax:0,
+    liveParse:r=>{const t=(r.winning_numbers||"").trim().split(/\s+/).map(Number);
+      if(t.length<20||t.some(isNaN))return null;return{d:r.draw_date.slice(0,10),n:t.slice(0,20),s:null};}},
+  nyquickdraw:{name:"NY Quick Draw",type:"ball",src:"live",largeField:true,limit:20000,
+    endpoint:"https://data.ny.gov/resource/7sqk-ycpk.json",
+    whiteCount:20,whiteMax:80,specialName:null,specialMax:0,
+    liveParse:r=>{const t=(r.winning_numbers||"").trim().split(/\s+/).map(Number);
+      if(t.length<20||t.some(isNaN))return null;return{d:(r.draw_date||"").slice(0,10),n:t.slice(0,20),s:null};}}
 };
 
 const state={game:"powerball",cache:{},charts:[],window:"90"};
@@ -342,7 +360,7 @@ async function getDraws(key){
   const g=GAMES[key];
   let draws;
   if(g.src==="live"){
-    const url=g.endpoint+"?$limit=50000&$order=draw_date%20DESC";
+    const url=g.endpoint+"?$limit="+(g.limit||50000)+"&$order=draw_date%20DESC";
     const res=await fetch(url);
     if(!res.ok)throw new Error("HTTP "+res.status);
     const tord=t=>t==='evening'?2:t==='midday'?1:0;
@@ -376,6 +394,7 @@ function analyzeBall(draws,g){
   const sFreq=Array(specialMax+1).fill(0);
   const sums=[],odd=[],low=[],ranges=[];
   const lowThresh=Math.floor(whiteMax/2);
+  const bigField=g.largeField||g.whiteCount>10;
   const pairs={}, triplets={}; let consecDraws=0, repeatWithPrev=0, repeatTotal=0;
 
   draws.forEach((d,i)=>{
@@ -390,10 +409,14 @@ function analyzeBall(draws,g){
     let hasConsec=false;
     for(let k=1;k<ns.length;k++)if(ns[k]-ns[k-1]===1)hasConsec=true;
     if(hasConsec)consecDraws++;
-    // pair & triplet co-occurrence
-    for(let a=0;a<ns.length;a++)for(let b=a+1;b<ns.length;b++){
-      const key=ns[a]+"-"+ns[b]; pairs[key]=(pairs[key]||0)+1;
-      for(let c=b+1;c<ns.length;c++){const tk=ns[a]+"-"+ns[b]+"-"+ns[c]; triplets[tk]=(triplets[tk]||0)+1;}}
+    // pair & triplet co-occurrence — skipped for large-field keno-style games
+    // (with 20 numbers per draw the O(k^3) triplet loop explodes and the
+    //  results aren't meaningful), so only compute for standard 5–6 ball games.
+    if(!bigField){
+      for(let a=0;a<ns.length;a++)for(let b=a+1;b<ns.length;b++){
+        const key=ns[a]+"-"+ns[b]; pairs[key]=(pairs[key]||0)+1;
+        for(let c=b+1;c<ns.length;c++){const tk=ns[a]+"-"+ns[b]+"-"+ns[c]; triplets[tk]=(triplets[tk]||0)+1;}}
+    }
     // repeat from previous draw
     if(i<draws.length-1){
       const prev=new Set(draws[i+1].n);
@@ -481,7 +504,7 @@ function analyzeBall(draws,g){
     sumHist:hist(sums,g.whiteCount,g.whiteCount*whiteMax,12),
     topPairs,consecPct:consecDraws/N*100,
     repeatPct:repeatWithPrev/prevComparable*100,avgRepeat:repeatTotal/prevComparable,
-    byYear,whiteCount:g.whiteCount,topTriplets,
+    byYear,whiteCount:g.whiteCount,topTriplets,bigField,
     expected,sd,gapArr,maxGap,companions,sumSeries,dateSeries};
 }
 
@@ -918,11 +941,11 @@ function renderBall(g,all,draws){
     <div class="card"><h3>🗂️ Decade spread</h3><div class="sub">How numbers spread across 1–10, 11–20, and so on.</div><div class="chartbox"><canvas id="c_decade"></canvas></div></div>
     <div class="card"><h3>🔗 Most common pairs</h3><div class="sub">Number pairs that appeared together most often.</div>
       <table><thead><tr><th>Pair</th><th>Times together</th></tr></thead><tbody>
-      ${A.topPairs.map(p=>`<tr><td class="num">${p.k.split('-').map(x=>String(x).padStart(2,'0')).join(' & ')}</td><td>${p.c}</td></tr>`).join("")}
+      ${A.topPairs.length?A.topPairs.map(p=>`<tr><td class="num">${p.k.split('-').map(x=>String(x).padStart(2,'0')).join(' & ')}</td><td>${p.c}</td></tr>`).join(""):`<tr><td colspan="2" style="color:var(--muted)">${A.bigField?'Not shown for keno-style games (20 numbers per draw make pair counts uninformative).':'Not enough draws yet.'}</td></tr>`}
       </tbody></table></div>
     <div class="card"><h3>🔺 Most common triplets</h3><div class="sub">Three-number combinations that appeared together most often.</div>
       <table><thead><tr><th>Triplet</th><th>Times together</th></tr></thead><tbody>
-      ${A.topTriplets.length?A.topTriplets.map(p=>`<tr><td class="num">${p.k.split('-').map(x=>String(x).padStart(2,'0')).join(' · ')}</td><td>${p.c}</td></tr>`).join(""):`<tr><td colspan="2" style="color:var(--muted)">Not enough draws yet.</td></tr>`}
+      ${A.topTriplets.length?A.topTriplets.map(p=>`<tr><td class="num">${p.k.split('-').map(x=>String(x).padStart(2,'0')).join(' · ')}</td><td>${p.c}</td></tr>`).join(""):`<tr><td colspan="2" style="color:var(--muted)">${A.bigField?'Not shown for keno-style games (20 numbers per draw make triplet counts uninformative).':'Not enough draws yet.'}</td></tr>`}
       </tbody></table></div>
     <div class="card"><h3>Patterns</h3><div class="sub">Extra structural stats for this window.</div>
       <div class="stat-row" style="flex-direction:column">
