@@ -565,17 +565,19 @@ function digitFreqArray(draws){const f=Array(10).fill(0);draws.forEach(d=>d.g.fo
 /* ---- Consensus Quick Pick (FOR FUN — does NOT change odds) ----
    Ball games: weighted-random candidates biased by frequency + companion
    strength, then the candidate closest to the typical sum/odd/low profile wins. */
-function consensusBallPick(A,g){
+function consensusBallPick(A,g,pool,iters){
   const whiteMax=A.whiteMax,K=g.whiteCount,lowThresh=Math.floor(whiteMax/2);
+  if(!pool){pool=[];for(let n=1;n<=whiteMax;n++)pool.push(n);}
+  iters=iters||500;
   const modeOf=arr=>{const c={};arr.forEach(v=>c[v]=(c[v]||0)+1);return +Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0];};
   const modeOdd=modeOf(A.odd),modeLow=modeOf(A.low),targetSum=A.avgSum;
   const freq=n=>{const w=A.whites.find(x=>x.n===n);return w?w.count:0;};
   const weightedPick=(avail,set)=>{let tot=0;const ws=avail.map(n=>{let w=freq(n)+0.5;
     set.forEach(m=>{w*=1+((A.companions[m]||{})[n]||0)*0.25;});tot+=w;return w;});
     let r=Math.random()*tot;for(let i=0;i<avail.length;i++){r-=ws[i];if(r<=0)return avail[i];}return avail[avail.length-1];};
-  const gen=()=>{const chosen=[];while(chosen.length<K){const avail=[];for(let n=1;n<=whiteMax;n++)if(!chosen.includes(n))avail.push(n);chosen.push(weightedPick(avail,chosen));}return chosen.sort((a,b)=>a-b);};
+  const gen=()=>{const chosen=[];while(chosen.length<K){const avail=pool.filter(n=>!chosen.includes(n));chosen.push(weightedPick(avail,chosen));}return chosen.sort((a,b)=>a-b);};
   let best=null,bestScore=-Infinity;
-  for(let i=0;i<500;i++){const c=gen();const sum=c.reduce((a,b)=>a+b,0),oddc=c.filter(n=>n%2).length,lowc=c.filter(n=>n<=lowThresh).length,hot=c.reduce((a,n)=>a+freq(n),0);
+  for(let i=0;i<iters;i++){const c=gen();const sum=c.reduce((a,b)=>a+b,0),oddc=c.filter(n=>n%2).length,lowc=c.filter(n=>n<=lowThresh).length,hot=c.reduce((a,n)=>a+freq(n),0);
     const score=-Math.abs(sum-targetSum)*0.4-Math.abs(oddc-modeOdd)*3-Math.abs(lowc-modeLow)*3+hot*0.5;
     if(score>bestScore){bestScore=score;best=c;}}
   let special=null;
@@ -968,14 +970,15 @@ function renderBall(g,all,draws){
     <div class="card full"><h3>🧪 Strategy backtest</h3><div class="sub">Does betting "hot" or "overdue" numbers beat random? We replay each strategy's numbers against all ${all.length} past ${g.name} draws. If the theories worked, one row would pull ahead.</div>
       <button id="backBtn" class="tab">▶ Run backtest</button><div id="backOut" style="margin-top:10px"></div></div>`;
 
-  const fairCard=`
-    <div class="card full"><h3>🏅 Fairness report card</h3><div class="sub">Five independent statistical tests grade whether these results are indistinguishable from true randomness. A fair lottery should score well — and any "pattern" you spot is the kind chance produces on its own.</div>
-      <div id="fairOut"></div></div>`;
+  const poolCard=(g.type==='ball')?`
+    <div class="card full"><h3>🎯 Consensus picks with a smaller pool</h3><div class="sub">How the consensus pick concentrates if you only drew from the hottest numbers. <b style="color:var(--accent)">Narrowing your pool never improves your odds — the opposite:</b> if any drawn number falls outside your pool you can't match it, so the last column shows how often a smaller pool could even contain the winning set.</div>
+      <div id="poolOut" style="margin-top:6px"></div>
+      <div style="margin-top:10px"><button id="poolBtn" class="tab">🎲 Regenerate</button></div></div>`:'';
 
   const oddsCard=gameOddsTableHTML(state.game);
 
   document.getElementById("content").innerHTML=shortWindowNote(all)+matrixNote+`<div class="grid">
-    ${oddsCard}${evCard}${popCard}${fairCard}${simCard}${backCard}
+    ${oddsCard}${evCard}${popCard}${poolCard}${simCard}${backCard}
     <div class="card full" style="border-color:#5c4d1a"><h3>🎯 Quick Pick</h3><div class="sub">Two ways to generate a set: <b>Consensus</b> draws on this window's patterns (hot numbers, common companions, typical sum / odd-even / low-high); <b>Pure random</b> picks with no weighting at all. <b style="color:var(--accent)">For fun only: every combination has identical odds either way, and neither improves your chances of winning.</b></div><div id="pickOut" style="margin-top:6px"></div><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button id="pickBtn" class="tab">🎯 Consensus pick</button><button id="pickRnd" class="tab">🎰 Pure random</button></div></div>
     <div class="card full"><h3>🎟️ Check your ticket</h3><div class="sub">Enter your ${g.whiteCount} numbers to see how they'd have done against every past ${g.name} draw. <b style="color:var(--accent)">For fun only — to claim a real prize you must verify with the official lottery for your state.</b></div>
       <div class="tkline"><input id="tkNums" placeholder="${g.whiteCount} numbers 1–${A.whiteMax}, e.g. ${latest.n.map(pad2).join(' ')}" style="flex:1;min-width:200px">${A.hasSpecial?`<input id="tkSpec" placeholder="${g.specialName} 1–${A.specialMax}" style="width:130px">`:''}<button id="tkBtn" class="tab">Check</button></div>
@@ -1155,9 +1158,31 @@ function renderBall(g,all,draws){
   if(popBtn)popBtn.onclick=()=>scorePop([...new Set((document.getElementById('popNums').value.match(/\d+/g)||[]).map(Number))]);
   const popGen=document.getElementById('popGen');
   if(popGen)popGen.onclick=()=>{const t=generateLowPop(g);if(!t)return;const inp=document.getElementById('popNums');if(inp)inp.value=t.map(pad2).join(' ');scorePop(t);};
-  // ---- fairness report card ----
-  const fairOut=document.getElementById('fairOut');
-  if(fairOut)fairOut.innerHTML=fairnessHTML(runFairness(A.sums,A.whites.map(w=>w.count),A.wP));
+  // ---- consensus picks with a smaller pool ----
+  const poolOut=document.getElementById('poolOut');
+  const renderPoolTable=()=>{
+    if(!poolOut)return;
+    const K=g.whiteCount,wm=A.whiteMax;
+    const byFreq=[...A.whites].sort((a,b)=>b.count-a.count).map(w=>w.n);
+    const sizes=[wm,30,20,15].filter((s,i,arr)=>arr.indexOf(s)===i && (s===wm || (s>K && s<wm)));
+    const totalCombos=nCr(wm,K);
+    const rows=sizes.map(size=>{
+      const full=size>=wm;
+      const pool=full?byFreq.slice():byFreq.slice(0,size);
+      const pick=consensusBallPick(A,g,pool,full?300:150).nums;
+      const inside=full?1:nCr(size,K)/totalCombos;
+      const cov=full?'100% — every combination possible'
+        : (inside*100>=0.01?(inside*100).toFixed(2)+'%':'1 in '+oddsWord(1/inside));
+      return `<tr><td>${full?`Full field (1–${wm})`:`Top ${size} hottest`}</td>
+        <td class="num">${pick.map(pad2).join(' ')}</td>
+        <td style="color:${full?'var(--good)':'#ff5c5c'}">${cov}</td></tr>`;
+    }).join('');
+    poolOut.innerHTML=`<table><thead><tr><th>Number pool</th><th>Consensus pick</th><th>Chance the winning set is inside this pool</th></tr></thead><tbody>${rows}</tbody></table>
+      <div style="color:var(--accent);font-size:.8rem;margin-top:6px">Shrinking the pool only shrinks the share of possible winning combinations you're even eligible for — it can never raise your odds. Shown for interest, not as a strategy.</div>`;
+  };
+  renderPoolTable();
+  const poolBtn=document.getElementById('poolBtn');
+  if(poolBtn)poolBtn.onclick=renderPoolTable;
   // ---- Monte Carlo ----
   const simBtn=document.getElementById('simBtn');
   if(simBtn)simBtn.onclick=()=>{
@@ -1204,7 +1229,6 @@ function renderDigit(g,all,draws){
     <div class="card full"><h3>🎟️ Check your ticket</h3><div class="sub">Enter your ${g.digitCount} digits to see how they'd have done against every past ${g.name} draw. <b style="color:var(--accent)">For fun only — verify with the official lottery for your state to claim a prize.</b></div>
       <div class="tkline"><input id="tkNums" placeholder="${g.digitCount} digits 0–9, e.g. ${latest.g.join(' ')}" style="flex:1;min-width:180px"><button id="tkBtn" class="tab">Check</button></div>
       <div id="tkOut"></div></div>
-    <div class="card full"><h3>🏅 Fairness report card</h3><div class="sub">Five independent statistical tests grade whether these digit results are indistinguishable from true randomness.</div><div id="fairOut"></div></div>
     <div class="card full"><h3>Digit frequency by position</h3><div class="sub">How often each digit 0–9 landed in each position. In a fair game all bars trend toward equal over time.</div><div class="chartbox tall"><canvas id="c_pos"></canvas></div></div>
     <div class="card"><h3>Overall digit frequency vs chance</h3><div class="sub">All positions combined. Dashed line = expected from chance; shaded band = ±2σ random range.</div><div class="chartbox"><canvas id="c_all"></canvas></div></div>
     <div class="card"><h3>🎲 Randomness test (χ²)</h3><div class="sub">Chi-square goodness-of-fit of the digit frequencies against a perfectly uniform draw.</div>
@@ -1263,9 +1287,6 @@ function renderDigit(g,all,draws){
   if(pickBtn)pickBtn.onclick=()=>showDig(consensusDigitPick(A,g),'Consensus pick');
   if(pickRnd)pickRnd.onclick=()=>showDig(randomDigitPick(g),'Pure random');
   showDig(consensusDigitPick(A,g),'Consensus pick');
-  // fairness report card
-  const fairOut=document.getElementById('fairOut');
-  if(fairOut)fairOut.innerHTML=fairnessHTML(runFairness(A.sums,A.allFreq,A.dP));
   // ticket checker
   const tkBtn=document.getElementById('tkBtn');
   if(tkBtn)tkBtn.onclick=()=>{
