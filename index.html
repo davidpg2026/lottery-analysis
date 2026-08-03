@@ -655,6 +655,70 @@ function combinationPopularity(nums,g){
   return {score,factors,verdict,sum};
 }
 
+/* ---- Odds math & cross-game comparison (game choice is the ONLY lever that
+       changes the probability of winning; number choice never does) ---- */
+function nCr(n,k){if(k<0||k>n)return 0;k=Math.min(k,n-k);let r=1;for(let i=1;i<=k;i++)r=r*(n-k+i)/i;return r;}
+function oddsWord(x){
+  if(!isFinite(x)||x<=0)return '—';
+  const u=[[1e15,'quadrillion'],[1e12,'trillion'],[1e9,'billion'],[1e6,'million'],[1e3,'thousand']];
+  for(const [d,w] of u){if(x>=d)return (x/d>=100?Math.round(x/d).toLocaleString():(x/d).toFixed(1))+' '+w;}
+  return Math.round(x).toLocaleString();
+}
+// Top-prize odds for "matched-field" games (standard ball & straight digit).
+// Keno-style games (largeField) are excluded: their odds depend on how many
+// spots you choose, so they aren't directly comparable.
+function topPrizeOdds(g){
+  if(g.largeField)return null;
+  if(g.type==='ball'){
+    const white=nCr(g.whiteMax,g.whiteCount);
+    const jackpot=white*(g.specialMax>0?g.specialMax:1);
+    return {jackpot,white,hasSpecial:g.specialMax>0,
+      format:`${g.whiteCount} of ${g.whiteMax}`+(g.specialMax>0?` + 1 of ${g.specialMax}`:'')};
+  }
+  if(g.type==='digit'){
+    const straight=Math.pow(10,g.digitCount);
+    return {jackpot:straight,white:straight,hasSpecial:false,format:`${g.digitCount} digits, exact order`};
+  }
+  return null;
+}
+function anyPrizeOdds(g){ // only where a full prize table exists
+  if(!g.prizes)return null;
+  const per=g.prizes.reduce((a,pr)=>a+1/pr.odds,0);
+  return per>0?1/per:null;
+}
+function gameOddsTableHTML(currentKey){
+  const rows=[];
+  for(const k in GAMES){const g=GAMES[k];const o=topPrizeOdds(g);if(!o)continue;
+    rows.push({k,name:g.name,fmt:o.format,jackpot:o.jackpot,any:anyPrizeOdds(g)});}
+  rows.sort((a,b)=>a.jackpot-b.jackpot);
+  const best=rows[0]?.jackpot||1;
+  const body=rows.map(r=>{
+    const cur=r.k===currentKey;
+    const times=(r.jackpot/best);
+    return `<tr${cur?' style="background:rgba(245,197,24,.10)"':''}>
+      <td>${cur?'▸ ':''}<b${cur?' style="color:var(--accent)"':''}>${r.name}</b></td>
+      <td style="font-size:.82rem;color:var(--muted)">${r.fmt}</td>
+      <td>1 in ${oddsWord(r.jackpot)}</td>
+      <td>${r.any?('1 in '+oddsWord(r.any)):'—'}</td>
+      <td style="color:var(--muted)">${times<1.5?'best odds':'×'+oddsWord(times)+' harder'}</td></tr>`;
+  }).join('');
+  return `<div class="card full" style="border-color:#1e3a5c"><h3>🎯 Which game gives the best shot?</h3>
+    <div class="sub">The one thing that truly changes your <b>probability of winning</b> is <b>which game you play</b>, never which numbers you pick. Games are ranked by the odds of hitting the top prize (computed from each game's current matrix), best first. <b style="color:var(--accent)">Caveat: better odds come with far smaller prizes</b> — a Pick 3 straight pays a few hundred dollars; a jackpot pays millions. This ranks the <i>chance</i> of a top hit, not its size.</div>
+    <table style="margin-top:8px"><thead><tr><th>Game</th><th>Format</th><th>Top-prize odds</th><th>Any prize</th><th>vs best</th></tr></thead><tbody>${body}</tbody></table>
+    <div style="color:var(--muted);font-size:.78rem;margin-top:6px">"Any prize" is shown only where a full prize table is built in. Pick 10 &amp; Quick Draw are keno-style — odds depend on how many spots you play — so they're not listed here.</div></div>`;
+}
+// Suggest the least-crowded pick found over many random draws — identical odds of
+// winning, but fewer co-winners to split a jackpot with.
+function generateLowPop(g){
+  let best=null,bestScore=99;
+  for(let i=0;i<500;i++){
+    const t=randTicket(g.whiteMax,g.whiteCount);
+    const r=combinationPopularity(t,g);
+    if(r.score<bestScore){bestScore=r.score;best=t;if(bestScore===0)break;}
+  }
+  return best;
+}
+
 /* ---- Monte Carlo & strategy backtest ---- */
 function randTicket(max,count){const pool=[];for(let n=1;n<=max;n++)pool.push(n);
   for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
@@ -891,8 +955,8 @@ function renderBall(g,all,draws){
       </div><div id="evOut"></div></div>`:'';
 
   const popCard=`
-    <div class="card full"><h3>👥 Combination popularity</h3><div class="sub">Choosing rare patterns does <b>not</b> improve your odds — but if you win, an unpopular set means fewer people to split with. Enter ${g.whiteCount} numbers to score how crowded your pick is.</div>
-      <div class="tkline"><input id="popNums" placeholder="${g.whiteCount} numbers 1–${A.whiteMax}, e.g. ${latest.n.map(pad2).join(' ')}" style="flex:1;min-width:200px"><button id="popBtn" class="tab">Score it</button></div>
+    <div class="card full"><h3>👥 Combination popularity</h3><div class="sub">Choosing rare patterns does <b>not</b> improve your odds — but if you win, an unpopular set means fewer people to split with. Enter ${g.whiteCount} numbers to score how crowded your pick is, or let it suggest a low-crowd set.</div>
+      <div class="tkline"><input id="popNums" placeholder="${g.whiteCount} numbers 1–${A.whiteMax}, e.g. ${latest.n.map(pad2).join(' ')}" style="flex:1;min-width:200px"><button id="popBtn" class="tab">Score it</button><button id="popGen" class="tab">🎲 Suggest a low-crowd pick</button></div>
       <div id="popOut"></div></div>`;
 
   const simCard=`
@@ -908,8 +972,10 @@ function renderBall(g,all,draws){
     <div class="card full"><h3>🏅 Fairness report card</h3><div class="sub">Five independent statistical tests grade whether these results are indistinguishable from true randomness. A fair lottery should score well — and any "pattern" you spot is the kind chance produces on its own.</div>
       <div id="fairOut"></div></div>`;
 
+  const oddsCard=gameOddsTableHTML(state.game);
+
   document.getElementById("content").innerHTML=shortWindowNote(all)+matrixNote+`<div class="grid">
-    ${evCard}${popCard}${fairCard}${simCard}${backCard}
+    ${oddsCard}${evCard}${popCard}${fairCard}${simCard}${backCard}
     <div class="card full" style="border-color:#5c4d1a"><h3>🎯 Quick Pick</h3><div class="sub">Two ways to generate a set: <b>Consensus</b> draws on this window's patterns (hot numbers, common companions, typical sum / odd-even / low-high); <b>Pure random</b> picks with no weighting at all. <b style="color:var(--accent)">For fun only: every combination has identical odds either way, and neither improves your chances of winning.</b></div><div id="pickOut" style="margin-top:6px"></div><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button id="pickBtn" class="tab">🎯 Consensus pick</button><button id="pickRnd" class="tab">🎰 Pure random</button></div></div>
     <div class="card full"><h3>🎟️ Check your ticket</h3><div class="sub">Enter your ${g.whiteCount} numbers to see how they'd have done against every past ${g.name} draw. <b style="color:var(--accent)">For fun only — to claim a real prize you must verify with the official lottery for your state.</b></div>
       <div class="tkline"><input id="tkNums" placeholder="${g.whiteCount} numbers 1–${A.whiteMax}, e.g. ${latest.n.map(pad2).join(' ')}" style="flex:1;min-width:200px">${A.hasSpecial?`<input id="tkSpec" placeholder="${g.specialName} 1–${A.specialMax}" style="width:130px">`:''}<button id="tkBtn" class="tab">Check</button></div>
@@ -1061,7 +1127,12 @@ function renderBall(g,all,draws){
       const r=computeEV(g,jp,tax,split,mult);
       const rows=r.tiers.map(t=>`<tr><td class="num">${t.label}</td><td>1 in ${fmt(t.odds)}</td><td>${money(t.prize)}</td><td>${money(t.contrib)}</td></tr>`).join('');
       const col=r.ev>=0?'var(--good)':'#ff5c5c';
+      const bev=r.breakEven;
+      const verdict=(jp>=bev&&bev>0)
+        ? `At this jackpot the raw expected value is <b>positive</b> — but that assumes the full advertised annuity and only ${split} winner${split>1?'s':''}. Take the lump-sum cash value (roughly 50–60% of the annuity) and the extra winners a record jackpot draws in, and the real return almost always slips back below zero.`
+        : `The jackpot would need to reach about <b>${money(bev)}</b> for the average $${g.ticketPrice} ticket just to break even${split>1?` when split ${split} ways`:''} — and even there, the cash-value discount keeps it a losing bet.`;
       evOut.innerHTML=`<div class="stat-row"><div class="stat"><div class="v" style="color:${col}">${money(r.ev)}</div><div class="l">Value per $${g.ticketPrice} ticket</div></div><div class="stat"><div class="v" style="color:${col}">${r.evPct.toFixed(0)}%</div><div class="l">Return on price</div></div><div class="stat"><div class="v">${money(r.breakEven)}</div><div class="l">Break-even jackpot</div></div></div>
+        <div style="margin-top:8px;font-size:.85rem;color:${col}">${verdict}</div>
         <table style="margin-top:10px"><thead><tr><th>Match</th><th>Odds</th><th>Value</th><th>Value ÷ odds</th></tr></thead><tbody>${rows}</tbody></table>
         <div style="color:var(--muted);font-size:.78rem;margin-top:6px">Value per ticket = Σ(prize ÷ odds) − price. Jackpot is shown after tax and splitting;${g.avgMult?' non-jackpot prizes use your average multiplier;':''} taxes applied to every tier. Assumes the advertised annuity jackpot — a lump sum is smaller, making the real EV worse.</div>`;
     };
@@ -1069,18 +1140,21 @@ function renderBall(g,all,draws){
     drawEV();
   }
   // ---- combination popularity ----
-  const popBtn=document.getElementById('popBtn');
-  if(popBtn)popBtn.onclick=()=>{
-    const out=document.getElementById('popOut');
-    const raw=[...new Set((document.getElementById('popNums').value.match(/\d+/g)||[]).map(Number))];
-    if(raw.length!==g.whiteCount||raw.some(n=>n<1||n>A.whiteMax)){out.innerHTML=`<div class="tkres">Enter exactly ${g.whiteCount} different numbers between 1 and ${A.whiteMax}.</div>`;return;}
+  const popOut=document.getElementById('popOut');
+  const scorePop=raw=>{
+    if(!popOut)return;
+    if(raw.length!==g.whiteCount||raw.some(n=>n<1||n>A.whiteMax)){popOut.innerHTML=`<div class="tkres">Enter exactly ${g.whiteCount} different numbers between 1 and ${A.whiteMax}.</div>`;return;}
     const r=combinationPopularity(raw,g),bar=r.score*10,col=r.score>=6?'#ff5c5c':r.score>=3?'var(--accent)':'var(--good)';
-    out.innerHTML=`<div class="tkres"><div style="font-weight:600;margin-bottom:6px">Crowd score: ${r.score} / 10</div>
+    popOut.innerHTML=`<div class="tkres"><div style="font-weight:600;margin-bottom:6px">Crowd score: ${r.score} / 10</div>
       <div style="height:10px;border-radius:6px;background:#20272f;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:${bar}%;background:${col}"></div></div>
       <div style="margin-bottom:6px">${r.verdict}</div>
       <ul style="margin:0 0 4px 18px;padding:0">${r.factors.map(f=>`<li style="margin:2px 0">${f}</li>`).join('')}</ul>
       <div style="color:var(--accent);font-size:.8rem;margin-top:6px">Every combination has identical odds of being drawn — this only changes how many people you'd share a jackpot with.</div></div>`;
   };
+  const popBtn=document.getElementById('popBtn');
+  if(popBtn)popBtn.onclick=()=>scorePop([...new Set((document.getElementById('popNums').value.match(/\d+/g)||[]).map(Number))]);
+  const popGen=document.getElementById('popGen');
+  if(popGen)popGen.onclick=()=>{const t=generateLowPop(g);if(!t)return;const inp=document.getElementById('popNums');if(inp)inp.value=t.map(pad2).join(' ');scorePop(t);};
   // ---- fairness report card ----
   const fairOut=document.getElementById('fairOut');
   if(fairOut)fairOut.innerHTML=fairnessHTML(runFairness(A.sums,A.whites.map(w=>w.count),A.wP));
@@ -1125,6 +1199,7 @@ function renderDigit(g,all,draws){
   const daily=draws.some(d=>d.t==='midday')&&draws.some(d=>d.t==='evening');
   const todCard=daily?`<div class="card full"><h3>🕐 Midday vs evening</h3><div class="sub">Overall digit frequency split by draw time.</div><div class="chartbox"><canvas id="c_tod"></canvas></div></div>`:``;
   document.getElementById("content").innerHTML=shortWindowNote(all)+`<div class="grid">
+    ${gameOddsTableHTML(state.game)}
     <div class="card full" style="border-color:#5c4d1a"><h3>🎯 Quick Pick</h3><div class="sub"><b>Consensus</b> draws each digit from its position's historical frequency; <b>Pure random</b> uses no weighting. <b style="color:var(--accent)">For fun only: draws are random and neither option improves your odds.</b></div><div id="pickOut" style="margin-top:6px"></div><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button id="pickBtn" class="tab">🎯 Consensus pick</button><button id="pickRnd" class="tab">🎰 Pure random</button></div></div>
     <div class="card full"><h3>🎟️ Check your ticket</h3><div class="sub">Enter your ${g.digitCount} digits to see how they'd have done against every past ${g.name} draw. <b style="color:var(--accent)">For fun only — verify with the official lottery for your state to claim a prize.</b></div>
       <div class="tkline"><input id="tkNums" placeholder="${g.digitCount} digits 0–9, e.g. ${latest.g.join(' ')}" style="flex:1;min-width:180px"><button id="tkBtn" class="tab">Check</button></div>
