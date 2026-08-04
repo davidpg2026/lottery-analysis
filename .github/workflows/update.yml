@@ -1,0 +1,41 @@
+name: Update lottery data
+
+# Runs every morning to pull the latest Illinois results and commit them.
+# You can also trigger it by hand from the Actions tab (Run workflow).
+on:
+  schedule:
+    - cron: '0 13 * * *'   # ~13:00 UTC = early morning U.S. Central time
+  workflow_dispatch: {}
+
+permissions:
+  contents: write           # lets the workflow commit the updated index.html
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the site
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install curl_cffi
+        run: pip install curl_cffi
+
+      - name: Fetch latest results and update index.html
+        run: python update.py
+
+      - name: Commit any new draws
+        run: |
+          git config user.name  "lottery-updater"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          if git diff --staged --quiet; then
+            echo "No new draws today."
+          else
+            git commit -m "Update Illinois lottery results ($(date -u +%Y-%m-%d))"
+            git push
+          fi
