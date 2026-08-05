@@ -32,10 +32,12 @@ The multi-state and New York games need no maintenance — the page reads the li
 data.ny.gov feed each time it opens. There is nothing to run and your computer can
 be off.
 
-A GitHub Action (`.github/workflows/update.yml`) is included to refresh the built-in
-Illinois snapshots on a schedule. It runs `update.py`; if that script isn't present
-in the repository the workflow simply has nothing to do and the live games are
-unaffected.
+The Illinois games are updated **manually**. They have no open-data feed, and the
+Illinois lottery site now blocks automated scraping from GitHub's servers (HTTP 403),
+so the old daily Action (`.github/workflows/update.yml`, running `update.py`) can no
+longer run reliably — its scheduled trigger is disabled. To refresh Illinois, add the
+new draws to the `IL_DATA` block in `index.html` (newest first) and commit. The live
+NY and multi-state games are unaffected and keep updating on their own.
 
 ## Add another game later
 
