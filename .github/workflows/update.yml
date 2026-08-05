@@ -3,8 +3,7 @@ name: Update lottery data
 # Runs every morning to pull the latest Illinois results and commit them.
 # You can also trigger it by hand from the Actions tab (Run workflow).
 on:
-  schedule:
-    - cron: '0 13 * * *'   # ~13:00 UTC = early morning U.S. Central time
+  
   workflow_dispatch: {}
 
 permissions:
