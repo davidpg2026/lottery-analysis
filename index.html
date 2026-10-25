@@ -515,6 +515,109 @@ function consensusDigitPick(A,g){
   const pick=arr=>{let tot=0;const ws=arr.map(v=>v+0.5);ws.forEach(w=>tot+=w);let r=Math.random()*tot;for(let i=0;i<10;i++){r-=ws[i];if(r<=0)return i;}return 9;};
   return {digits:A.posFreq.map(pf=>pick(pf)),fb:g.fireball?pick(A.fFreq):null};
 }
+/* ---- Top Consensus pick by window (FOR FUN — does NOT change odds) ----
+   Instead of keeping the best of a few hundred random candidates, find the
+   single highest-scoring ticket under the same Consensus score:
+     score = -0.4*|sum - avg sum| - 3*|odd - typical odd| - 3*|low - typical low|
+             + 0.5*(total times the chosen numbers were drawn)
+   For 5–6 ball games this is exact: a dynamic program covers every
+   combination. Keno-style games (20 of 80) have far too many combinations,
+   so they use a thorough local search and say so. */
+const TOP_WINDOWS=[["30","Last 30"],["60","Last 60"],["90","Last 90"],["365","Last 365"],["all","All"]];
+function topModeOf(arr){const c={};arr.forEach(v=>c[v]=(c[v]||0)+1);const e=Object.entries(c).sort((a,b)=>b[1]-a[1]);return e.length?+e[0][0]:0;}
+function topArgmax(arr,from){let bi=from,bv=-1;for(let i=from;i<arr.length;i++)if(arr[i]>bv){bv=arr[i];bi=i;}return bv>0?bi:null;}
+function topBallStats(slice,g){
+  const M=g.whiteMax,K=g.whiteCount,hasSpecial=g.specialName!=null,LT=Math.floor(M/2);
+  const ds=slice.filter(d=>d.n.every(x=>x>=1&&x<=M)&&(!hasSpecial||d.s==null||(d.s>=1&&d.s<=g.specialMax)));
+  const f=Array(M+1).fill(0),sf=Array((hasSpecial?g.specialMax:0)+1).fill(0),odd=[],low=[];let sumTot=0;
+  ds.forEach(d=>{d.n.forEach(n=>f[n]++);if(hasSpecial&&d.s!=null)sf[d.s]++;
+    sumTot+=d.n.reduce((a,b)=>a+b,0);odd.push(d.n.filter(n=>n%2).length);low.push(d.n.filter(n=>n<=LT).length);});
+  return {N:ds.length,M,K,LT,f,sf,hasSpecial,T:ds.length?sumTot/ds.length:0,mO:topModeOf(odd),mL:topModeOf(low)};
+}
+function topScore(st,nums){let s=0,o=0,l=0,h=0;nums.forEach(n=>{s+=n;o+=n%2;l+=(n<=st.LT);h+=st.f[n];});
+  return -Math.abs(s-st.T)*0.4-Math.abs(o-st.mO)*3-Math.abs(l-st.mL)*3+h*0.5;}
+// Exact search for 5–6 ball games. State = (count, odd count, low count, sum);
+// value = most total hits reachable. Every combination maps to one state.
+function topBallExact(st){
+  const {M,K,LT,f}=st,O1=K+1,L1=K+1,S1=K*M-K*(K-1)/2+1;
+  const size=(K+1)*O1*L1*S1,idx=(k,o,l,s)=>((k*O1+o)*L1+l)*S1+s;
+  const best=new Int32Array(size).fill(-1);best[0]=0;
+  const dec=[];
+  for(let n=1;n<=M;n++){
+    const d=new Uint8Array(size),od=n%2,lw=n<=LT?1:0;
+    for(let k=Math.min(K,n);k>=1;k--)for(let o=od;o<=k;o++)for(let l=lw;l<=k;l++)for(let s=n;s<S1;s++){
+      const src=best[idx(k-1,o-od,l-lw,s-n)];if(src<0)continue;
+      const v=src+f[n],t=idx(k,o,l,s);if(v>best[t]){best[t]=v;d[t]=1;}}
+    dec[n]=d;
+  }
+  let bs=-Infinity,bt=null;
+  for(let o=0;o<=K;o++)for(let l=0;l<=K;l++)for(let s=0;s<S1;s++){const h=best[idx(K,o,l,s)];if(h<0)continue;
+    const sc=-Math.abs(s-st.T)*0.4-Math.abs(o-st.mO)*3-Math.abs(l-st.mL)*3+h*0.5;
+    if(sc>bs){bs=sc;bt=[K,o,l,s];}}
+  if(!bt)return null;
+  let [k,o,l,s]=bt;const nums=[];
+  for(let n=M;n>=1&&k>0;n--){if(dec[n][idx(k,o,l,s)]){nums.push(n);k--;o-=n%2;l-=(n<=LT);s-=n;}}
+  return {nums:nums.sort((a,b)=>a-b),score:bs,exact:true};
+}
+// Keno-style games: hill-climb with single swaps from many starting sets.
+function topBallSearch(st){
+  const {M,K,f}=st,all=[];for(let n=1;n<=M;n++)all.push(n);
+  const byHot=[...all].sort((a,b)=>f[b]-f[a]||a-b);
+  let bestNums=null,bs=-Infinity;
+  for(let r=0;r<40;r++){
+    let cur;
+    if(r===0)cur=byHot.slice(0,K);
+    else{const p=[...all];for(let i=p.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[p[i],p[j]]=[p[j],p[i]];}cur=p.slice(0,K);}
+    let cs=topScore(st,cur),improved=true;
+    while(improved){improved=false;let mv=null,mvs=cs;const inSet=new Set(cur);
+      for(let i=0;i<K;i++)for(const n of all){if(inSet.has(n))continue;const c=cur.slice();c[i]=n;const sc=topScore(st,c);if(sc>mvs+1e-9){mvs=sc;mv=c;}}
+      if(mv){cur=mv;cs=mvs;improved=true;}}
+    if(cs>bs){bs=cs;bestNums=cur.slice();}
+  }
+  return {nums:bestNums.sort((a,b)=>a-b),score:bs,exact:false};
+}
+function topBallPicksHTML(g,all){
+  const big=g.largeField||g.whiteCount>10;
+  const rows=TOP_WINDOWS.map(([w,label])=>{
+    const slice=w==="all"?all:all.slice(0,+w),st=topBallStats(slice,g);
+    if(!st.N)return `<tr><td>${label}</td><td>0</td><td colspan="${g.specialName?2:1}" style="color:var(--muted)">No draws yet</td></tr>`;
+    const r=big?topBallSearch(st):topBallExact(st);
+    const sp=st.hasSpecial?topArgmax(st.sf,1):null;
+    return `<tr><td>${label}</td><td>${st.N}</td><td class="num">${r?r.nums.map(pad2).join(' '):'—'}</td>${g.specialName?`<td class="num">${sp!=null?pad2(sp):'—'}</td>`:''}</tr>`;
+  }).join('');
+  const combos=nCr(g.whiteMax,g.whiteCount);
+  const note=big
+    ?`With ${g.whiteCount} numbers from 1–${g.whiteMax} there are about ${oddsWord(combos)} combinations — too many to check one by one — so these are the best tickets found by a thorough search.`
+    :`Each row is the exact best of all ${Math.round(combos).toLocaleString()} possible combinations under the Consensus score${g.specialName?`; the ${g.specialName} is the one drawn most often in that window`:''}. Ties go to the lower number.`;
+  return `<div style="overflow-x:auto"><table><thead><tr><th>Window</th><th>Draws</th><th>Top Consensus pick</th>${g.specialName?`<th>${g.specialName}</th>`:''}</tr></thead><tbody>${rows}</tbody></table></div>
+    <div style="color:var(--muted);font-size:.8rem;margin-top:6px">${note} <b style="color:var(--accent)">A top score only means the ticket looks most like recent draws — its odds are exactly the same as any other ticket.</b></div>`;
+}
+// Digit games: the Consensus generator draws each position from its own
+// frequency, so its single most likely result is the most frequent digit in
+// each position (exact; ties go to the lower digit).
+function topDigitPicksHTML(g,all){
+  const rows=TOP_WINDOWS.map(([w,label])=>{
+    const ds=w==="all"?all:all.slice(0,+w);
+    if(!ds.length)return `<tr><td>${label}</td><td>0</td><td colspan="${g.fireball?2:1}" style="color:var(--muted)">No draws yet</td></tr>`;
+    const pos=Array.from({length:g.digitCount},()=>Array(10).fill(0)),ff=Array(10).fill(0);
+    ds.forEach(d=>{d.g.forEach((x,i)=>{if(i<g.digitCount)pos[i][x]++;});if(d.f!=null)ff[d.f]++;});
+    const digits=pos.map(p=>topArgmax(p,0));const fb=g.fireball?topArgmax(ff,0):null;
+    return `<tr><td>${label}</td><td>${ds.length}</td><td class="num">${digits.map(x=>x==null?'—':x).join(' ')}</td>${g.fireball?`<td class="num">${fb!=null?fb:'—'}</td>`:''}</tr>`;
+  }).join('');
+  return `<div style="overflow-x:auto"><table><thead><tr><th>Window</th><th>Draws</th><th>Top Consensus pick</th>${g.fireball?'<th>Fireball</th>':''}</tr></thead><tbody>${rows}</tbody></table></div>
+    <div style="color:var(--muted);font-size:.8rem;margin-top:6px">The most frequent digit in each position for that window — the Consensus pick's single most likely result. Ties go to the lower digit. <b style="color:var(--accent)">Every combination still has exactly the same odds.</b></div>`;
+}
+function fillTopPicks(g,all){
+  const el=document.getElementById('topPickOut');if(!el)return;
+  const key=(g.key||state.game)+':'+all.length+':'+(all[0]?all[0].d:'');
+  state.topPickCache=state.topPickCache||{};
+  if(state.topPickCache[key]){el.innerHTML=state.topPickCache[key];return;}
+  el.innerHTML='<div style="color:var(--muted)">Checking every combination…</div>';
+  setTimeout(()=>{try{const h=g.type==='digit'?topDigitPicksHTML(g,all):topBallPicksHTML(g,all);
+    state.topPickCache[key]=h;const el2=document.getElementById('topPickOut');if(el2)el2.innerHTML=h;}
+    catch(e){const el2=document.getElementById('topPickOut');if(el2)el2.innerHTML=`<div class="err">Couldn't work out the top picks (${escHTML(e.message)}).</div>`;}},30);
+}
+
 /* Pure-random picks (no weighting at all) */
 function randomBallPick(A,g){
   const pool=[];for(let n=1;n<=A.whiteMax;n++)pool.push(n);
@@ -899,7 +1002,7 @@ function renderBall(g,all,draws){
 
   document.getElementById("content").innerHTML=shortWindowNote(all)+matrixNote+`<div class="grid">
     ${oddsCard}${popCard}${poolCard}${simCard}${backCard}
-    <div class="card full" style="border-color:#5c4d1a"><h3>🎯 Quick Pick</h3><div class="sub">Two ways to generate a set: <b>Consensus</b> draws on this window's patterns (hot numbers, common companions, typical sum / odd-even / low-high); <b>Pure random</b> picks with no weighting at all. <b style="color:var(--accent)">For fun only: every combination has identical odds either way, and neither improves your chances of winning.</b></div><div id="pickOut" style="margin-top:6px"></div><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button id="pickBtn" class="tab">🎯 Consensus pick</button><button id="pickRnd" class="tab">🎰 Pure random</button></div></div>
+    <div class="card full" style="border-color:#5c4d1a"><h3>🎯 Quick Pick</h3><div class="sub">Two ways to generate a set: <b>Consensus</b> draws on this window's patterns (hot numbers, common companions, typical sum / odd-even / low-high); <b>Pure random</b> picks with no weighting at all. <b style="color:var(--accent)">For fun only: every combination has identical odds either way, and neither improves your chances of winning.</b></div><div id="pickOut" style="margin-top:6px"></div><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button id="pickBtn" class="tab">🎯 Consensus pick</button><button id="pickRnd" class="tab">🎰 Pure random</button></div><h3 style="margin-top:18px">🏆 Top Consensus pick by window</h3><div class="sub">The single highest-scoring ticket for each window, instead of the best of a few hundred random tries.</div><div id="topPickOut" style="margin-top:6px"></div></div>
     <div class="card full"><h3>🎟️ Check your ticket</h3><div class="sub">Enter your ${g.whiteCount} numbers to see how they'd have done against every past ${g.name} draw. <b style="color:var(--accent)">For fun only — to claim a real prize you must verify with the official lottery for your state.</b></div>
       <div class="tkline"><input id="tkNums" placeholder="${g.whiteCount} numbers 1–${A.whiteMax}, e.g. ${latest.n.map(pad2).join(' ')}" style="flex:1;min-width:200px">${A.hasSpecial?`<input id="tkSpec" placeholder="${g.specialName} 1–${A.specialMax}" style="width:130px">`:''}<button id="tkBtn" class="tab">Check</button></div>
       <div id="tkOut"></div></div>
@@ -995,6 +1098,7 @@ function renderBall(g,all,draws){
   if(pickBtn)pickBtn.onclick=()=>showBall(consensusBallPick(A,g),'Consensus pick');
   if(pickRnd)pickRnd.onclick=()=>showBall(randomBallPick(A,g),'Pure random');
   showBall(consensusBallPick(A,g),'Consensus pick');
+  fillTopPicks(g,all);
   // ticket checker
   const tkBtn=document.getElementById('tkBtn');
   if(tkBtn)tkBtn.onclick=()=>{
@@ -1114,7 +1218,7 @@ function renderDigit(g,all,draws){
   const todCard=daily?`<div class="card full"><h3>🕐 Midday vs evening</h3><div class="sub">Overall digit frequency split by draw time.</div><div class="chartbox"><canvas id="c_tod"></canvas></div></div>`:``;
   document.getElementById("content").innerHTML=shortWindowNote(all)+`<div class="grid">
     ${gameOddsTableHTML(state.game)}
-    <div class="card full" style="border-color:#5c4d1a"><h3>🎯 Quick Pick</h3><div class="sub"><b>Consensus</b> draws each digit from its position's historical frequency; <b>Pure random</b> uses no weighting. <b style="color:var(--accent)">For fun only: draws are random and neither option improves your odds.</b></div><div id="pickOut" style="margin-top:6px"></div><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button id="pickBtn" class="tab">🎯 Consensus pick</button><button id="pickRnd" class="tab">🎰 Pure random</button></div></div>
+    <div class="card full" style="border-color:#5c4d1a"><h3>🎯 Quick Pick</h3><div class="sub"><b>Consensus</b> draws each digit from its position's historical frequency; <b>Pure random</b> uses no weighting. <b style="color:var(--accent)">For fun only: draws are random and neither option improves your odds.</b></div><div id="pickOut" style="margin-top:6px"></div><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button id="pickBtn" class="tab">🎯 Consensus pick</button><button id="pickRnd" class="tab">🎰 Pure random</button></div><h3 style="margin-top:18px">🏆 Top Consensus pick by window</h3><div class="sub">The single highest-scoring ticket for each window, instead of the best of a few hundred random tries.</div><div id="topPickOut" style="margin-top:6px"></div></div>
     <div class="card full"><h3>🎟️ Check your ticket</h3><div class="sub">Enter your ${g.digitCount} digits to see how they'd have done against every past ${g.name} draw. <b style="color:var(--accent)">For fun only — verify with the official lottery for your state to claim a prize.</b></div>
       <div class="tkline"><input id="tkNums" placeholder="${g.digitCount} digits 0–9, e.g. ${latest.g.join(' ')}" style="flex:1;min-width:180px"><button id="tkBtn" class="tab">Check</button></div>
       <div id="tkOut"></div></div>
@@ -1171,6 +1275,7 @@ function renderDigit(g,all,draws){
   if(pickBtn)pickBtn.onclick=()=>showDig(consensusDigitPick(A,g),'Consensus pick');
   if(pickRnd)pickRnd.onclick=()=>showDig(randomDigitPick(g),'Pure random');
   showDig(consensusDigitPick(A,g),'Consensus pick');
+  fillTopPicks(g,all);
   // ticket checker
   const tkBtn=document.getElementById('tkBtn');
   if(tkBtn)tkBtn.onclick=()=>{
